@@ -29,10 +29,16 @@ public class Player : MonoBehaviour
     private float rotation;
     private float dashTimer;
     private float dashingTime;
+    private float sensitivity;
+    private float rotX;
+    private float rotY;
 
+    private Vector2 mousePos;
+    private Vector2 mouseDelta;
     private Vector3 move;
+    private Quaternion cam;
 
-    Rigidbody player;
+    private Rigidbody player;
 
     private PlayerInput PlayerInput;
     private InputAction _move;
@@ -40,6 +46,8 @@ public class Player : MonoBehaviour
     private InputAction _dash;
     private InputAction _fire;
     private InputAction _block;
+    private InputAction _mousePos;
+    private InputAction _mouseDelta;
 
     void Start()
     {
@@ -48,6 +56,11 @@ public class Player : MonoBehaviour
 
         dashTimer = -1f;
         dashingTime = -1f;
+        sensitivity = 100f;
+
+        rotX = player.transform.rotation.eulerAngles.x > 180 ? player.transform.rotation.eulerAngles.x - 360 : player.transform.rotation.eulerAngles.x;
+        rotY = player.transform.rotation.eulerAngles.y > 180 ? player.transform.rotation.eulerAngles.y - 360 : player.transform.rotation.eulerAngles.y;
+        rotX *= -1;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -66,6 +79,12 @@ public class Player : MonoBehaviour
 
         _block = PlayerInput.actions.FindAction("Block");
         _block.performed += _ => Block();
+
+        _mousePos = PlayerInput.actions.FindAction("MousePos");
+        _mousePos.performed += ctx => mousePos = ctx.ReadValue<Vector2>();
+
+        _mouseDelta = PlayerInput.actions.FindAction("MouseDelta");
+        _mouseDelta.performed += ctx => mouseDelta = ctx.ReadValue<Vector2>();
         #endregion
     }
 
@@ -75,6 +94,9 @@ public class Player : MonoBehaviour
         IsGrounded();
 
         UpdateDash();
+
+        rotY += (mouseDelta.x * Time.deltaTime * sensitivity);
+        player.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
     }
 
     private void FixedUpdate()
@@ -145,7 +167,12 @@ public class Player : MonoBehaviour
 
     public void Fire()
     {
+        Ray ray = Camera.main.ScreenPointToRay(mousePos);
 
+        if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.gameObject.CompareTag("Player"))
+        {
+            Destroy(hit.collider.gameObject);
+        }
     }
 
     public void Block()
@@ -155,19 +182,23 @@ public class Player : MonoBehaviour
 
     private void SetRotation()
     {
-        rotation = Vector3.Angle(Vector3.right, move);
+        rotation = Vector3.Angle(player.transform.right, move);
         if (move.y < 0)
             rotation *= -1;
     }
 
     private void SetVelocity(float speed)
     {
-        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
+        player.velocity = (Time.deltaTime * speed * move.x * player.transform.right
+                        + Time.deltaTime * speed * player.velocity.y * player.transform.up
+                        + Time.deltaTime * speed * move.y * player.transform.forward);
     }
 
     private void AddVelocity(float speed)
     {
-        player.velocity += new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
+        player.velocity += (Time.deltaTime * speed * move.x * player.transform.right
+                         + Time.deltaTime * speed * player.velocity.y * player.transform.up
+                         + Time.deltaTime * speed * move.y * player.transform.forward);
     }
 
     private bool IsGrounded()
