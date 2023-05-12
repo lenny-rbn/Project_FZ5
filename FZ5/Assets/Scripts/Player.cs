@@ -6,28 +6,29 @@ using UnityEngine.InputSystem;
 public class Player : MonoBehaviour
 {
     [Header("Movement")]
-    [SerializeField] private float maxSpeed = 10f;
-    [SerializeField] private float acceleration = 20f;
-    [SerializeField] private float deceleration = 2f;
+    [SerializeField] private float maxSpeed;
+    [SerializeField] private float acceleration;
+    [SerializeField] private float deceleration;
 
     [Header("Jump")]
-    [SerializeField] private int jumpVelocity = 10;
-    [SerializeField] private float lowJumpMult = 3f;
-    [SerializeField] private float fallMult = 1.5f;
+    [SerializeField] private int jumpVelocity;
+    [SerializeField] private float lowJumpMult;
+    [SerializeField] private float fallMult;
 
     [Header("Dash")]
-    [SerializeField] private float dashTime = 0.1f;
-    [SerializeField] private float dashDistance = 1.5f;
-    [SerializeField] private float dashCoolDown = 0.2f;
-    [SerializeField] private float coefDecelDash = 1.75f;
+    [SerializeField] private float dashTime;
+    [SerializeField] private float dashDistance;
+    [SerializeField] private float dashCoolDown;
+    [SerializeField] private float coefDecelDash;
 
+    private bool canDash;
     private bool isJumping;
     private bool isDashing;
     private bool isGrounded;
 
     private float rotation;
-    private float lerpDash;
     private float dashTimer;
+    private float dashingTime;
 
     private Vector3 move;
 
@@ -37,14 +38,16 @@ public class Player : MonoBehaviour
     private InputAction _move;
     private InputAction _jump;
     private InputAction _dash;
+    private InputAction _fire;
+    private InputAction _block;
 
     void Start()
     {
         player = GetComponent<Rigidbody>();
         PlayerInput = GetComponent<PlayerInput>();
 
-        lerpDash = 0f;
         dashTimer = -1f;
+        dashingTime = -1f;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -57,21 +60,24 @@ public class Player : MonoBehaviour
 
         _dash = PlayerInput.actions.FindAction("Dash");
         _dash.performed += _ => Dash();
+
+        _fire = PlayerInput.actions.FindAction("Fire");
+        _fire.performed += _ => Fire();
+
+        _block = PlayerInput.actions.FindAction("Block");
+        _block.performed += _ => Block();
         #endregion
     }
 
 
-    void Update()
+    private void Update()
     {
-        isGrounded = IsGrounded();
+        IsGrounded();
 
-        if (dashTimer > 0)
-            dashTimer -= Time.deltaTime;
-        else
-            isDashing = false;
+        UpdateDash();
     }
 
-    void FixedUpdate()
+    private void FixedUpdate()
     {
         Move();
 
@@ -82,6 +88,87 @@ public class Player : MonoBehaviour
             player.velocity += lowJumpMult * Physics.gravity.y * Time.deltaTime * Vector3.up;
     }
 
+    public void Jump()
+    {
+        if (isGrounded)
+            player.velocity = Vector3.up * jumpVelocity;
+    }
+
+    public void Dash()
+    {
+        if (canDash && move != Vector3.zero)
+        {
+            canDash = false;
+            isDashing = true;
+            dashingTime = dashTime;
+            dashTimer = dashCoolDown;
+
+            SetVelocity(dashDistance / dashTime);
+        }
+    }
+    private void UpdateDash()
+    {
+        if (dashTimer > 0)
+            dashTimer -= Time.deltaTime;
+        else
+            canDash = true;
+
+        if (dashingTime > 0)
+            dashingTime -= Time.deltaTime;
+        else
+            isDashing = false;
+    }
+
+    public void Move()
+    {
+        if (move != Vector3.zero)
+        {
+            if (!isDashing)
+            {
+                SetRotation();
+                AddVelocity(acceleration);
+            }
+
+            if (isDashing)
+                SetVelocity(dashDistance / dashTime);
+            else if (player.velocity.magnitude > maxSpeed)
+                SetVelocity(maxSpeed);
+        }
+        else
+        {
+            if (isDashing)
+                SetVelocity(dashDistance / dashTime);
+            else
+                player.velocity = new Vector3(0f, player.velocity.y, 0f);
+        }
+    }
+
+    public void Fire()
+    {
+
+    }
+
+    public void Block()
+    {
+
+    }
+
+    private void SetRotation()
+    {
+        rotation = Vector3.Angle(Vector3.right, move);
+        if (move.y < 0)
+            rotation *= -1;
+    }
+
+    private void SetVelocity(float speed)
+    {
+        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
+    }
+
+    private void AddVelocity(float speed)
+    {
+        player.velocity += new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
+    }
 
     private bool IsGrounded()
     {
@@ -96,55 +183,5 @@ public class Player : MonoBehaviour
         }
 
         return isGrounded;
-    }
-
-    public void Jump()
-    {
-        if (isGrounded)
-            player.velocity = Vector3.up * jumpVelocity;
-    }
-
-    public void Dash()
-    {
-        if (!isDashing && move != Vector3.zero)
-        {
-            isDashing = true;
-            player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * dashDistance / dashTime, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * dashDistance / dashTime);
-            dashTimer = dashCoolDown;
-            lerpDash = 1;
-        }
-    }
-
-    public void Move()
-    {
-        if (move != Vector3.zero)
-        {
-            // Rotation
-            rotation = Vector3.Angle(Vector3.right, move);
-            if (move.y < 0)
-                rotation *= -1;
-
-            // Acceleration
-            player.velocity += new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * acceleration, 0, Mathf.Sin(rotation * Mathf.Deg2Rad) * acceleration);
-
-            // Velocity cap
-            if (isDashing)
-            {
-                player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * (dashDistance / dashTime), player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * (dashDistance / dashTime));
-                lerpDash -= Time.deltaTime * coefDecelDash;
-            }
-            else if (player.velocity.magnitude > maxSpeed)
-                player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * maxSpeed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * maxSpeed);
-        }
-        else
-        {
-            if (isDashing)
-            {
-                player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * (dashDistance / dashTime), player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * (dashDistance / dashTime));
-                lerpDash -= Time.deltaTime * coefDecelDash;
-            }
-            else
-                player.velocity = new Vector3(0f, player.velocity.y, 0f);
-        }
     }
 }
