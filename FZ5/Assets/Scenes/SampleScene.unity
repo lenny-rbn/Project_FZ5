@@ -240,6 +240,7 @@ MonoBehaviour:
   acceleration: 20
   deceleration: 2
   jumpVelocity: 10
+  jumpWindow: 0.25
   lowJumpMult: 3
   fallMult: 1.5
   dashTime: 0.1

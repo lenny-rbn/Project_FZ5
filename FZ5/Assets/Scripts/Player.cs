@@ -12,6 +12,7 @@ public class Player : MonoBehaviour
 
     [Header("Jump")]
     [SerializeField] private int jumpVelocity;
+    [SerializeField] private float jumpWindow;
     [SerializeField] private float lowJumpMult;
     [SerializeField] private float fallMult;
 
@@ -26,17 +27,17 @@ public class Player : MonoBehaviour
     private bool isDashing;
     private bool isGrounded;
 
-    private float rotation;
-    private float dashTimer;
-    private float dashingTime;
-    private float sensitivity;
     private float rotX;
     private float rotY;
+    private float rotation;
+    private float dashTimer;
+    private float jumpBuffer;
+    private float dashingTime;
+    private float sensitivity;
 
     private Vector2 mousePos;
     private Vector2 mouseDelta;
     private Vector3 move;
-    private Quaternion cam;
 
     private Rigidbody player;
 
@@ -54,13 +55,12 @@ public class Player : MonoBehaviour
         player = GetComponent<Rigidbody>();
         PlayerInput = GetComponent<PlayerInput>();
 
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         dashTimer = -1f;
         dashingTime = -1f;
         sensitivity = 100f;
-
-        rotX = player.transform.rotation.eulerAngles.x > 180 ? player.transform.rotation.eulerAngles.x - 360 : player.transform.rotation.eulerAngles.x;
-        rotY = player.transform.rotation.eulerAngles.y > 180 ? player.transform.rotation.eulerAngles.y - 360 : player.transform.rotation.eulerAngles.y;
-        rotX *= -1;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -92,11 +92,23 @@ public class Player : MonoBehaviour
     private void Update()
     {
         IsGrounded();
+        SetRotation();
+        UpdateStates();
 
-        UpdateDash();
+        if (jumpBuffer > 0f && isGrounded)
+        {
+            Debug.Log(jumpBuffer);
+            player.velocity = Vector3.up * jumpVelocity;
+            jumpBuffer = 0f;
+        }
 
         rotY += (mouseDelta.x * Time.deltaTime * sensitivity);
+        rotX += (mouseDelta.y * Time.deltaTime * sensitivity);
+        rotX = Mathf.Clamp(rotX, -90f, 90f);
+
         player.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+        //Camera.main.transform.rotation = Quaternion.Euler(-rotX, rotY, 0f);
+        mouseDelta = Vector2.zero;
     }
 
     private void FixedUpdate()
@@ -112,8 +124,7 @@ public class Player : MonoBehaviour
 
     public void Jump()
     {
-        if (isGrounded)
-            player.velocity = Vector3.up * jumpVelocity;
+        jumpBuffer = jumpWindow;
     }
 
     public void Dash()
@@ -128,8 +139,11 @@ public class Player : MonoBehaviour
             SetVelocity(dashDistance / dashTime);
         }
     }
-    private void UpdateDash()
+    private void UpdateStates()
     {
+        if (jumpBuffer > 0)
+            jumpBuffer -= Time.deltaTime;
+
         if (dashTimer > 0)
             dashTimer -= Time.deltaTime;
         else
@@ -145,11 +159,7 @@ public class Player : MonoBehaviour
     {
         if (move != Vector3.zero)
         {
-            if (!isDashing)
-            {
-                SetRotation();
-                AddVelocity(acceleration);
-            }
+            AddVelocity(acceleration);
 
             if (isDashing)
                 SetVelocity(dashDistance / dashTime);
@@ -182,23 +192,32 @@ public class Player : MonoBehaviour
 
     private void SetRotation()
     {
-        rotation = Vector3.Angle(player.transform.right, move);
+        rotation = Vector3.Angle(Vector3.right, player.transform.forward);
+        Debug.Log("Y: " + player.transform.rotation.eulerAngles.y);
+
+        // Change 0-180 degrees angle to 0-360 degrees angle
+        if (player.transform.rotation.eulerAngles.y > 90f && player.transform.rotation.eulerAngles.y < 270f)
+            rotation = 360f - rotation;
+
         if (move.y < 0)
-            rotation *= -1;
+        {
+            if (rotation > 0f && rotation < 180f)
+                rotation += 180f;
+            else
+                rotation -= 180f;
+        }
+
+        Debug.Log("Rotation: " + rotation);
     }
 
     private void SetVelocity(float speed)
     {
-        player.velocity = (Time.deltaTime * speed * move.x * player.transform.right
-                        + Time.deltaTime * speed * player.velocity.y * player.transform.up
-                        + Time.deltaTime * speed * move.y * player.transform.forward);
+        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
     }
 
     private void AddVelocity(float speed)
     {
-        player.velocity += (Time.deltaTime * speed * move.x * player.transform.right
-                         + Time.deltaTime * speed * player.velocity.y * player.transform.up
-                         + Time.deltaTime * speed * move.y * player.transform.forward);
+        player.velocity += new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
     }
 
     private bool IsGrounded()
