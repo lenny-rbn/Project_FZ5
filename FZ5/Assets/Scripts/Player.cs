@@ -60,6 +60,7 @@ public class Player : MonoBehaviour
         Cursor.visible = false;
 
         dashTimer = -1f;
+        jumpBuffer = -1f;
         dashingTime = -1f;
 
         #region Input Actions
