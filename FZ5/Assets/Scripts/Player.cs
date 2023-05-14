@@ -8,19 +8,21 @@ public class Player : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float maxSpeed;
     [SerializeField] private float acceleration;
-    [SerializeField] private float deceleration;
+    [SerializeField] private float deceleration; // not used
 
     [Header("Jump")]
     [SerializeField] private int jumpVelocity;
     [SerializeField] private float jumpWindow;
-    [SerializeField] private float lowJumpMult;
-    [SerializeField] private float fallMult;
+    [SerializeField] private float jumpGravity;
 
     [Header("Dash")]
     [SerializeField] private float dashTime;
     [SerializeField] private float dashDistance;
     [SerializeField] private float dashCoolDown;
     [SerializeField] private float coefDecelDash;
+
+    [Header("Camera")]
+    [SerializeField] private float sensitivity;
 
     private bool canDash;
     private bool isJumping;
@@ -33,7 +35,6 @@ public class Player : MonoBehaviour
     private float dashTimer;
     private float jumpBuffer;
     private float dashingTime;
-    private float sensitivity;
 
     private Vector2 mousePos;
     private Vector2 mouseDelta;
@@ -60,7 +61,6 @@ public class Player : MonoBehaviour
 
         dashTimer = -1f;
         dashingTime = -1f;
-        sensitivity = 100f;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -97,7 +97,7 @@ public class Player : MonoBehaviour
         if (jumpBuffer > 0f && isGrounded)
         {
             Debug.Log("Buffered time left: " + (int)(jumpBuffer * 1000) + "ms");
-            player.velocity = Vector3.up * jumpVelocity;
+            player.velocity = new Vector3(player.velocity.x, jumpVelocity, player.velocity.z);
             jumpBuffer = 0f;
         }
 
@@ -116,9 +116,9 @@ public class Player : MonoBehaviour
 
         // Jump gravity
         if (player.velocity.y > 0)
-            player.velocity += fallMult * Physics.gravity.y * Time.deltaTime * Vector3.up;
+            player.velocity += jumpGravity * Physics.gravity.y * Time.deltaTime * Vector3.up;
         else if (player.velocity.y < 0 || isJumping)
-            player.velocity += lowJumpMult * Physics.gravity.y * Time.deltaTime * Vector3.up;
+            player.velocity += jumpGravity * Physics.gravity.y * Time.deltaTime * Vector3.up;
     }
 
     public void Jump()
@@ -209,7 +209,7 @@ public class Player : MonoBehaviour
 
     private void SetVelocity(float speed)
     {
-        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
+        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y * System.Convert.ToInt32(!isDashing), Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
     }
 
     private void AddVelocity(float speed)
