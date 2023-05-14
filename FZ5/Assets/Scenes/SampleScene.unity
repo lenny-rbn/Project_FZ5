@@ -243,7 +243,7 @@ MonoBehaviour:
   jumpWindow: 0.25
   lowJumpMult: 3
   fallMult: 1.5
-  dashTime: 0.1
+  dashTime: 0.2
   dashDistance: 5
   dashCoolDown: 0.5
   coefDecelDash: 10

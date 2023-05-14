@@ -92,12 +92,11 @@ public class Player : MonoBehaviour
     private void Update()
     {
         IsGrounded();
-        SetRotation();
         UpdateStates();
 
         if (jumpBuffer > 0f && isGrounded)
         {
-            Debug.Log(jumpBuffer);
+            Debug.Log("Buffered time left: " + (int)(jumpBuffer * 1000) + "ms");
             player.velocity = Vector3.up * jumpVelocity;
             jumpBuffer = 0f;
         }
@@ -159,7 +158,11 @@ public class Player : MonoBehaviour
     {
         if (move != Vector3.zero)
         {
-            AddVelocity(acceleration);
+            if (!isDashing)
+            {
+                SetRotation();
+                AddVelocity(acceleration);
+            }
 
             if (isDashing)
                 SetVelocity(dashDistance / dashTime);
@@ -193,21 +196,15 @@ public class Player : MonoBehaviour
     private void SetRotation()
     {
         rotation = Vector3.Angle(Vector3.right, player.transform.forward);
-        Debug.Log("Y: " + player.transform.rotation.eulerAngles.y);
 
-        // Change 0-180 degrees angle to 0-360 degrees angle
+        // Set rotation to 0-360° angles
         if (player.transform.rotation.eulerAngles.y > 90f && player.transform.rotation.eulerAngles.y < 270f)
             rotation = 360f - rotation;
 
-        if (move.y < 0)
-        {
-            if (rotation > 0f && rotation < 180f)
-                rotation += 180f;
-            else
-                rotation -= 180f;
-        }
+        if (move.y == 0) rotation -= 90f * move.x;
+        else rotation -= 45f * move.x * move.y;
 
-        Debug.Log("Rotation: " + rotation);
+        if (move.y < 0) rotation = rotation < 180f ? rotation + 180f : rotation - 180f;
     }
 
     private void SetVelocity(float speed)
