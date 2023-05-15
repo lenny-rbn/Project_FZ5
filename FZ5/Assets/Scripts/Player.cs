@@ -117,8 +117,6 @@ public class Player : MonoBehaviour
         player.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
         Camera.main.transform.rotation = Quaternion.Euler(-rotX, rotY, 0f);
 
-        Debug.Log(cRotation);
-        //Camera.main.transform.position = new Vector3()
         mouseDelta = Vector2.zero;
     }
 
@@ -202,14 +200,14 @@ public class Player : MonoBehaviour
 
     public void Block()
     {
-
+        canDash = true;
     }
 
     private void SetRotation()
     {
         pRotation = Vector3.Angle(Vector3.right, player.transform.forward);
 
-        // Set rotation to 0-360° angles
+        // Set rotation to 0-360Â° angles
         if (player.transform.rotation.eulerAngles.y > 90f && player.transform.rotation.eulerAngles.y < 270f)
             pRotation = 360f - pRotation;
 
@@ -221,7 +219,7 @@ public class Player : MonoBehaviour
 
     private void SetVelocity(float speed)
     {
-        player.velocity = new Vector3(Mathf.Cos(pRotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(pRotation * Mathf.Deg2Rad) * speed);
+        player.velocity = new Vector3(Mathf.Cos(pRotation * Mathf.Deg2Rad) * speed, player.velocity.y * System.Convert.ToInt32(!isDashing), Mathf.Sin(pRotation * Mathf.Deg2Rad) * speed);
     }
 
     private void AddVelocity(float speed)
