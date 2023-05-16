@@ -34,6 +34,7 @@ public class Player : MonoBehaviour
     private float pRotation;
     private float cRotation;
     private float dashTimer;
+    private float camSpring;
     private float jumpBuffer;
     private float dashingTime;
 
@@ -63,6 +64,7 @@ public class Player : MonoBehaviour
         dashTimer = -1f;
         jumpBuffer = -1f;
         dashingTime = -1f;
+        camSpring = Camera.main.transform.position.z;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -108,14 +110,15 @@ public class Player : MonoBehaviour
 
     private void UpdateCamera()
     {
-        cRotation = Vector3.Angle(Vector3.up, Camera.main.transform.up);
+        cRotation = Camera.main.transform.rotation.eulerAngles.x;
+        Debug.Log(cRotation);
 
         rotY += (mouseDelta.x * Time.deltaTime * sensitivity);
         rotX += (mouseDelta.y * Time.deltaTime * sensitivity);
         rotX = Mathf.Clamp(rotX, -90f, 90f);
 
         player.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
-        Camera.main.transform.rotation = Quaternion.Euler(-rotX, rotY, 0f);
+        Camera.main.transform.parent.rotation = Quaternion.Euler(-rotX, rotY, 0f);
 
         mouseDelta = Vector2.zero;
     }
