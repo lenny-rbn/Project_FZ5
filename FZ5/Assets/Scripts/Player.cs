@@ -21,28 +21,47 @@ public class Player : MonoBehaviour
     [SerializeField] private float dashCoolDown;
     [SerializeField] private float coefDecelDash;
 
+    [Header("Block")]
+    [SerializeField] private float blockTime;
+    [SerializeField] private float blockCoolDown;
+
+    [Header("Attack")]
+    [SerializeField] private float attackTime;
+    [SerializeField] private float attackCoolDown;
+
     [Header("Camera")]
     [SerializeField] private float sensitivity;
 
     private bool canDash;
-    private bool isJumping;
+    private bool canBlock;
+    private bool canAttack;
+    private bool isMelee;
     private bool isDashing;
     private bool isGrounded;
+    private bool isBlocking;
+    private bool isAttacking;
 
     private float rotX;
     private float rotY;
-    private float pRotation;
-    private float cRotation;
-    private float dashTimer;
-    private float camSpring;
+    private float rotation;
+
     private float jumpBuffer;
+
+    private float dashTimer;
+    private float blockTimer;
+    private float attackTimer;
     private float dashingTime;
+    private float blockingTime;
+    private float attackingTime;
 
     private Vector2 mousePos;
     private Vector2 mouseDelta;
     private Vector3 move;
 
+    public GameObject weapon;
+
     private Rigidbody player;
+    private new Renderer renderer;
 
     private PlayerInput PlayerInput;
     private InputAction _move;
@@ -50,6 +69,7 @@ public class Player : MonoBehaviour
     private InputAction _dash;
     private InputAction _fire;
     private InputAction _block;
+    private InputAction _switch;
     private InputAction _mousePos;
     private InputAction _mouseDelta;
 
@@ -57,14 +77,17 @@ public class Player : MonoBehaviour
     {
         player = GetComponent<Rigidbody>();
         PlayerInput = GetComponent<PlayerInput>();
+        renderer = player.GetComponent<Renderer>();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
+        isMelee = true;
         dashTimer = -1f;
+        blockTimer = -1f;
         jumpBuffer = -1f;
         dashingTime = -1f;
-        camSpring = Camera.main.transform.position.z;
+        attackTimer = -1f;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -73,7 +96,6 @@ public class Player : MonoBehaviour
 
         _jump = PlayerInput.actions.FindAction("Jump");
         _jump.performed += _ => Jump();
-        _jump.canceled += _ => isJumping = true;
 
         _dash = PlayerInput.actions.FindAction("Dash");
         _dash.performed += _ => Dash();
@@ -84,6 +106,9 @@ public class Player : MonoBehaviour
         _block = PlayerInput.actions.FindAction("Block");
         _block.performed += _ => Block();
 
+        _switch = PlayerInput.actions.FindAction("Switch");
+        _switch.performed += _ => Switch();
+
         _mousePos = PlayerInput.actions.FindAction("MousePos");
         _mousePos.performed += ctx => mousePos = ctx.ReadValue<Vector2>();
 
@@ -92,27 +117,8 @@ public class Player : MonoBehaviour
         #endregion
     }
 
-
-    private void Update()
-    {
-        IsGrounded();
-        UpdateStates();
-
-        if (jumpBuffer > 0f && isGrounded)
-        {
-            Debug.Log("Buffered time left: " + (int)(jumpBuffer * 1000) + "ms");
-            player.velocity = new Vector3(player.velocity.x, jumpVelocity, player.velocity.z);
-            jumpBuffer = 0f;
-        }
-
-        UpdateCamera();
-    }
-
     private void UpdateCamera()
     {
-        cRotation = Camera.main.transform.rotation.eulerAngles.x;
-        Debug.Log(cRotation);
-
         rotY += (mouseDelta.x * Time.deltaTime * sensitivity);
         rotX += (mouseDelta.y * Time.deltaTime * sensitivity);
         rotX = Mathf.Clamp(rotX, -90f, 90f);
@@ -128,9 +134,7 @@ public class Player : MonoBehaviour
         Move();
 
         // Jump gravity
-        if (player.velocity.y > 0)
-            player.velocity += jumpGravity * Physics.gravity.y * Time.deltaTime * Vector3.up;
-        else if (player.velocity.y < 0 || isJumping)
+        if (player.velocity.y != 0)
             player.velocity += jumpGravity * Physics.gravity.y * Time.deltaTime * Vector3.up;
     }
 
@@ -141,30 +145,67 @@ public class Player : MonoBehaviour
 
     public void Dash()
     {
-        if (canDash && move != Vector3.zero)
+        if (canDash && !isAttacking && !isBlocking && move != Vector3.zero)
         {
             canDash = false;
             isDashing = true;
             dashingTime = dashTime;
             dashTimer = dashCoolDown;
 
-            SetVelocity(dashDistance / dashTime);
+            if (player.velocity.y < 0f)
+                player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * dashDistance / dashTime, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * dashDistance / dashTime);
+            else
+                SetVelocity(dashDistance / dashTime);
         }
     }
+
     private void UpdateStates()
     {
-        if (jumpBuffer > 0)
+        // Jump
+        if (jumpBuffer > 0f)
             jumpBuffer -= Time.deltaTime;
 
-        if (dashTimer > 0)
+        // Dash
+        if (dashTimer > 0f)
             dashTimer -= Time.deltaTime;
         else
             canDash = true;
 
-        if (dashingTime > 0)
+        if (dashingTime > 0f)
             dashingTime -= Time.deltaTime;
         else
             isDashing = false;
+
+        // Attack
+        if (attackTimer > 0f)
+            attackTimer -= Time.deltaTime;
+        else
+            canAttack = true;
+
+        if (attackingTime > 0f)
+        {
+            attackingTime -= Time.deltaTime;
+            renderer.material.SetColor("_Color", Color.red);
+        }
+        else
+            isAttacking = false;
+
+        // Block
+        if (blockTimer > 0f)
+            blockTimer -= Time.deltaTime;
+        else
+            canBlock = true;
+
+        if (blockingTime > 0f)
+        {
+            blockingTime -= Time.deltaTime;
+            renderer.material.SetColor("_Color", Color.green);
+        }
+        else
+            isBlocking = false;
+
+        if (!isAttacking && !isBlocking)
+            renderer.material.SetColor("_Color", Color.clear);
     }
 
     public void Move()
@@ -193,41 +234,72 @@ public class Player : MonoBehaviour
 
     public void Fire()
     {
-        Ray ray = Camera.main.ScreenPointToRay(mousePos);
-
-        if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.gameObject.CompareTag("Player"))
+        if (canAttack)
         {
-            Destroy(hit.collider.gameObject);
+            // Canceling
+            canBlock = true;
+
+            canAttack = false;
+            isAttacking = true;
+            attackingTime = attackTime;
+            attackTimer = attackCoolDown;
+
+            Ray ray = Camera.main.ScreenPointToRay(mousePos);
+
+            if (Physics.Raycast(ray, out RaycastHit hit) && hit.collider.gameObject.CompareTag("Player"))
+                Destroy(hit.collider.gameObject);
         }
     }
 
     public void Block()
     {
-        canDash = true;
+        if (canBlock)
+        {
+            canBlock = false;
+            isBlocking = true;
+            blockingTime = blockTime;
+            blockTimer = blockCoolDown;
+        }
+    }
+
+    public void Switch()
+    {
+        canAttack = true;
+
+        if (isMelee)
+        {
+            isMelee = false;
+            weapon.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        }
+        else
+        {
+            isMelee = true;
+            weapon.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
+        }
     }
 
     private void SetRotation()
     {
-        pRotation = Vector3.Angle(Vector3.right, player.transform.forward);
+        rotation = Vector3.Angle(Vector3.right, player.transform.forward);
 
-        // Set rotation to 0-360° angles
+        // Set rotation to 0-360Â° angles
         if (player.transform.rotation.eulerAngles.y > 90f && player.transform.rotation.eulerAngles.y < 270f)
-            pRotation = 360f - pRotation;
+            rotation = 360f - rotation;
 
-        if (move.y == 0) pRotation -= 90f * move.x;
-        else pRotation -= 45f * move.x * move.y;
+        if (move.y == 0) rotation -= 90f * move.x;
+        else rotation -= 45f * move.x * move.y;
 
-        if (move.y < 0) pRotation = pRotation < 180f ? pRotation + 180f : pRotation - 180f;
+        if (move.y < 0) rotation = rotation < 180f ? rotation + 180f : rotation - 180f;
     }
 
     private void SetVelocity(float speed)
     {
-        player.velocity = new Vector3(Mathf.Cos(pRotation * Mathf.Deg2Rad) * speed, player.velocity.y * System.Convert.ToInt32(!isDashing), Mathf.Sin(pRotation * Mathf.Deg2Rad) * speed);
+        player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, player.velocity.y, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
     }
 
     private void AddVelocity(float speed)
     {
-        player.velocity += new Vector3(Mathf.Cos(pRotation * Mathf.Deg2Rad) * speed, 0f, Mathf.Sin(pRotation * Mathf.Deg2Rad) * speed);
+        player.velocity += new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * speed, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * speed);
     }
 
     private bool IsGrounded()
@@ -237,11 +309,23 @@ public class Player : MonoBehaviour
         isGrounded = false;
 
         if (Physics.Raycast(transform.position + Vector3.right * (-0.2f), Vector3.down, 1.2f, mask) || Physics.Raycast(transform.position + Vector3.right * (0.2f), Vector3.down, 1.2f, mask) || Physics.Raycast(transform.position, Vector3.down, 1.2f, mask) || Physics.Raycast(transform.position + Vector3.forward * (-0.2f), Vector3.down, 1.2f, mask) || Physics.Raycast(transform.position + Vector3.forward * (0.2f), Vector3.down, 1.2f, mask))
-        {
             isGrounded = true;
-            isJumping = false;
-        }
 
         return isGrounded;
+    }
+
+    private void Update()
+    {
+        IsGrounded();
+        UpdateStates();
+
+        if (jumpBuffer > 0f && isGrounded)
+        {
+            Debug.Log("Buffered time left: " + (int)(jumpBuffer * 1000) + "ms");
+            player.velocity = new Vector3(player.velocity.x, jumpVelocity, player.velocity.z);
+            jumpBuffer = 0f;
+        }
+
+        UpdateCamera();
     }
 }

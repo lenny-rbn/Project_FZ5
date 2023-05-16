@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657874, g: 0.49641275, b: 0.5748171, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -248,7 +248,12 @@ MonoBehaviour:
   dashDistance: 5
   dashCoolDown: 0.5
   coefDecelDash: 10
+  blockTime: 0.3
+  blockCoolDown: 1
+  attackTime: 0.3
+  attackCoolDown: 0.35
   sensitivity: 40
+  weapon: {fileID: 0}
 --- !u!114 &266394038
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -754,7 +759,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1506309976}
   m_Layer: 0
-  m_Name: Camera Point
+  m_Name: Rotation Point
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -886,7 +891,7 @@ GameObject:
   - component: {fileID: 1601265396}
   - component: {fileID: 1601265395}
   m_Layer: 0
-  m_Name: Cylinder
+  m_Name: Weapon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
