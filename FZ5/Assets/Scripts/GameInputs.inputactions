@@ -178,6 +178,17 @@
                 },
                 {
                     "name": "",
+                    "id": "96f2ed6e-562d-4cd1-80de-1b48f8b44c52",
+                    "path": "<Keyboard>/ctrl",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Block",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "ed14d329-4b73-4bef-aa98-880e8a9a2033",
                     "path": "<Mouse>/leftButton",
                     "interactions": "",

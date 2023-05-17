@@ -172,7 +172,10 @@ public class Player : MonoBehaviour
             canDash = true;
 
         if (dashingTime > 0f)
+        {
             dashingTime -= Time.deltaTime;
+            renderer.material.SetColor("_Color", Color.blue);
+        }
         else
             isDashing = false;
 
@@ -204,7 +207,7 @@ public class Player : MonoBehaviour
         else
             isBlocking = false;
 
-        if (!isAttacking && !isBlocking)
+        if (!isDashing && !isAttacking && !isBlocking)
             renderer.material.SetColor("_Color", Color.clear);
     }
 
