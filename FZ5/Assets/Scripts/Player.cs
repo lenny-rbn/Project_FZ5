@@ -33,6 +33,8 @@ public class Player : MonoBehaviour
     [SerializeField] private float sensitivity;
 
     private bool canDash;
+    private bool doLerp;
+    private bool bunny;
     private bool canBlock;
     private bool canAttack;
     private bool isMelee;
@@ -53,6 +55,8 @@ public class Player : MonoBehaviour
     private float dashingTime;
     private float blockingTime;
     private float attackingTime;
+
+    private float lerpSpeed;
 
     private Vector2 mousePos;
     private Vector2 mouseDelta;
@@ -83,11 +87,15 @@ public class Player : MonoBehaviour
         Cursor.visible = false;
 
         isMelee = true;
+        doLerp = false;
+
         dashTimer = -1f;
         blockTimer = -1f;
         jumpBuffer = -1f;
         dashingTime = -1f;
         attackTimer = -1f;
+
+        lerpSpeed = -1f;
 
         #region Input Actions
         _move = PlayerInput.actions.FindAction("Move");
@@ -147,20 +155,22 @@ public class Player : MonoBehaviour
     {
         if (canDash && !isAttacking && !isBlocking && move != Vector3.zero)
         {
+            doLerp = true;
             canDash = false;
             isDashing = true;
             dashingTime = dashTime;
             dashTimer = dashCoolDown;
 
-            if (player.velocity.y < 0f)
-                player.velocity = new Vector3(Mathf.Cos(rotation * Mathf.Deg2Rad) * dashDistance / dashTime, 0f, Mathf.Sin(rotation * Mathf.Deg2Rad) * dashDistance / dashTime);
-            else
-                SetVelocity(dashDistance / dashTime);
+            SetVelocity(dashDistance / dashTime);
         }
     }
 
     private void UpdateStates()
     {
+        // Dash to move lerp
+        if (lerpSpeed > 0f)
+            lerpSpeed -= Time.deltaTime * 2f + (Time.deltaTime * 3f * System.Convert.ToInt32(isGrounded));
+
         // Jump
         if (jumpBuffer > 0f)
             jumpBuffer -= Time.deltaTime;
@@ -177,7 +187,14 @@ public class Player : MonoBehaviour
             renderer.material.SetColor("_Color", Color.blue);
         }
         else
+        {
             isDashing = false;
+            if (doLerp)
+            {
+                doLerp = false;
+                lerpSpeed = 1f;
+            }
+        }
 
         // Attack
         if (attackTimer > 0f)
@@ -223,6 +240,8 @@ public class Player : MonoBehaviour
 
             if (isDashing)
                 SetVelocity(dashDistance / dashTime);
+            else if (lerpSpeed > 0f)
+                SetVelocity(Mathf.Lerp(maxSpeed, (dashDistance / dashTime), lerpSpeed));
             else if (player.velocity.magnitude > maxSpeed)
                 SetVelocity(maxSpeed);
         }
@@ -322,8 +341,11 @@ public class Player : MonoBehaviour
         IsGrounded();
         UpdateStates();
 
+        Debug.Log(lerpSpeed);
+
         if (jumpBuffer > 0f && isGrounded)
         {
+            if (jumpBuffer > 0.24f) bunny = true;
             Debug.Log("Buffered time left: " + (int)(jumpBuffer * 1000) + "ms");
             player.velocity = new Vector3(player.velocity.x, jumpVelocity, player.velocity.z);
             jumpBuffer = 0f;
