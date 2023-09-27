@@ -10,6 +10,31 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 
+enum State
+{
+	GROUNDED,
+	JUMPING,
+	FALLING,
+	WALLRUN,
+};
+
+enum Action
+{
+	NONE,
+	DASH,
+	PARRY,
+	ATTACK,
+	SPECIAL,
+};
+
+enum Item
+{
+	SWORD,
+	GUN,
+	HEAL,
+	UTIL,
+};
+
 UCLASS()
 class PROJECT_FZ5_API AS_Player : public ACharacter
 {
@@ -21,16 +46,6 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		UCameraComponent* Camera;
 
-	bool CanMove;
-	bool CanDash;
-	bool CanParry;
-	bool CanAttack;
-
-	bool IsMelee;
-	bool IsDashing;
-	bool IsParrying;
-	bool IsAttacking;
-
 	float DashCD;
 	float ParryCD;
 	float AttackCD;
@@ -39,6 +54,10 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float ParryTime;
 	float AttackTime;
 
+	State state;
+	Action action;
+	Item item;
+
 	FRotator Yaw;
 	FVector2D MoveDir;
 	FVector DashVelocity;
@@ -46,6 +65,10 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UCharacterMovementComponent* Player;
 
 	void UpdateStates(float DeltaTime);
+
+	bool CanDash();
+	bool CanParry();
+	bool CanAttack();
 
 protected:
 	virtual void BeginPlay() override;
