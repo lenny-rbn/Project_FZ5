@@ -10,30 +10,9 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 
-enum State
-{
-	GROUNDED,
-	JUMPING,
-	FALLING,
-	WALLRUN,
-};
-
-enum Action
-{
-	NONE,
-	DASH,
-	PARRY,
-	ATTACK,
-	SPECIAL,
-};
-
-enum Item
-{
-	SWORD,
-	GUN,
-	HEAL,
-	UTIL,
-};
+enum State { GROUNDED, JUMPING, FALLING, WALLRUN };
+enum Action { NONE, DASH, PARRY, ATTACK, SPECIAL };
+enum Item { SWORD, GUN, HEAL, UTIL };
 
 UCLASS()
 class PROJECT_FZ5_API AS_Player : public ACharacter
