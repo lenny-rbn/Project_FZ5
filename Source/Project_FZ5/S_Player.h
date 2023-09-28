@@ -22,6 +22,16 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
     UCameraComponent* Camera;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+        float WallCheckDistance;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+        float MaxWallRunTime;
+
+    bool IsWallRunning;
+    float WallRunTimer;
+    FHitResult LeftWallHit;
+    FHitResult RightWallHit;
+
     bool CanMove;
     bool CanDash;
     bool CanParry;
@@ -77,6 +87,10 @@ protected:
     void Dash(const FInputActionValue& Value);
     void Parry(const FInputActionValue& Value);
     void Attack(const FInputActionValue& Value);
+    void JumpButton(const FInputActionValue& Value);
+
+    bool TryWallRunning();
+    void WallRun();
 
 
 public:

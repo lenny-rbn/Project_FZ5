@@ -124,6 +124,47 @@ void AS_Player::Attack(const FInputActionValue& Value)
     }
 }
 
+void AS_Player::JumpButton(const FInputActionValue& Value)
+{
+    if (TryWallRunning())
+        WallRun();
+    else
+        Jump();
+}
+
+
+
+bool AS_Player::TryWallRunning()
+{
+    FVector PlayerLocation = GetActorLocation();
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+    Params.bDebugQuery = true;
+    if (GetWorld()->LineTraceSingleByChannel(LeftWallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    {
+        float dot = FVector::DotProduct(LeftWallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.8f)
+        {
+            return true;
+        }
+    }
+    else if (GetWorld()->LineTraceSingleByChannel(RightWallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    {
+        float dot = FVector::DotProduct(RightWallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.8f)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AS_Player::WallRun()
+{
+    UE_LOG(LogTemp, Warning, TEXT("WALL RUNNING"));
+}
+
 void AS_Player::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
@@ -165,7 +206,7 @@ void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AS_Player::Move);
         EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AS_Player::MoveCancel);
         EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AS_Player::Look);
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AS_Player::Jump);
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AS_Player::JumpButton);
         EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &AS_Player::Dash);
         EnhancedInputComponent->BindAction(ParryAction, ETriggerEvent::Started, this, &AS_Player::Parry);
         EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AS_Player::Attack);
