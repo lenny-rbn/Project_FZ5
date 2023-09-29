@@ -1,9 +1,9 @@
 #include "S_Player.h"
+#include "Camera/CameraComponent.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Camera/CameraComponent.h"
-#include "EnhancedInputSubsystems.h"
-#include "EnhancedInputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 
@@ -33,35 +33,43 @@ void AS_Player::BeginPlay()
         }
     }
 
-    CanMove = true;
-    CanDash = true;
-    CanParry = true;
-    CanAttack = true;
-
-    IsMelee = true;
-    IsDashing = false;
-    IsParrying = false;
-    IsAttacking = false;
-
     DashCD = 0.f;
     ParryCD = 0.f;
     AttackCD = 0.f;
     DashTime = 0.f;
 
+    state = GROUNDED;
+    action = NONE;
+    item = SWORD;
+
+    IsWallRunning = false;
+
     Player = GetCharacterMovement();
+}
+
+bool AS_Player::CanDash()
+{
+    return action == ATTACK || (action != PARRY && ParryCD < 0.f && DashCD < 0.f);
+}
+
+bool AS_Player::CanParry()
+{
+    return action != DASH && ParryCD < 0.f;
+}
+
+bool AS_Player::CanAttack()
+{
+    return action != PARRY && ParryCD < 0.f && AttackCD < 0.f;
 }
 
 void AS_Player::Move(const FInputActionValue& Value)
 {
-    if (!IsDashing)
+    if (action != DASH && IsWallRunning == false)
     {
         MoveDir = Value.Get<FVector2D>();
         MoveDir.Normalize();
         Yaw = FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f);
-    }
 
-    if (CanMove)
-    {
         AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), MoveDir.Y);
         AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), MoveDir.X);
     }
@@ -85,16 +93,13 @@ void AS_Player::Look(const FInputActionValue& Value)
 
 void AS_Player::Dash(const FInputActionValue& Value)
 {
-    if (CanDash)
+    if (CanDash())
     {
-        CanMove = false;
-        CanDash = false;
-        IsDashing = true;
+        action = DASH;
         DashCD = DashCooldown;
         DashTime = DashingTime;
         
         Player->Velocity.Z = 0.f;
-        Player->BrakingDecelerationWalking = 0.f;
 
         if (Player->IsMovingOnGround())
             Player->SetJumpAllowed(false);
@@ -106,63 +111,79 @@ void AS_Player::Dash(const FInputActionValue& Value)
 
 void AS_Player::Parry(const FInputActionValue& Value)
 {
-    if (CanParry)
+    if (CanParry())
     {
-        CanParry = false;
-        IsParrying = true;
+        action = PARRY;
         ParryCD = ParryCooldown;
+        ParryTime = ParryingTime;
     }
+}
+
+void AS_Player::ParryCancel()
+{
+    ParryCD -= ParryTime;
+    ParryTime = 0.f;
 }
 
 void AS_Player::Attack(const FInputActionValue& Value)
 {
-    if (CanAttack)
+    if (CanAttack())
     {
-        CanAttack = false;
-        IsAttacking = true;
+        action = ATTACK;
         AttackCD = AttackCooldown;
+        AttackTime = AttackingTime;
+
+        Player->SetJumpAllowed(true);
+        Player->BrakingDecelerationWalking = Deceleration;
     }
 }
 
 void AS_Player::JumpButton(const FInputActionValue& Value)
 {
-    if (TryWallRunning())
-        WallRun();
-    else
-        Jump();
+    if (IsWallRunning)
+    {
+        IsWallRunning = false;
+    }
+    else if (CanWallRun())
+    {
+        IsWallRunning = true;
+        WallRunVelocity = Player->Velocity.Size2D();
+    }
+    Jump();
 }
 
+bool AS_Player::CanWallRun()
+{
+    return action == NONE && GetWallRunDirection() != FVector::ZeroVector;
+}
 
-
-bool AS_Player::TryWallRunning()
+FVector AS_Player::GetWallRunDirection()
 {
     FVector PlayerLocation = GetActorLocation();
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
-    Params.bDebugQuery = true;
     if (GetWorld()->LineTraceSingleByChannel(LeftWallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
         float dot = FVector::DotProduct(LeftWallHit.ImpactNormal, GetActorForwardVector());
-        if (dot < -0.1f && dot > -0.8f)
+        if (dot < -0.1f && dot > -0.9f)
         {
-            return true;
+            FVector WallVector = FVector::CrossProduct(LeftWallHit.ImpactNormal, FVector::UpVector);
+            WallVector.Normalize();
+            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
         }
     }
     else if (GetWorld()->LineTraceSingleByChannel(RightWallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
         float dot = FVector::DotProduct(RightWallHit.ImpactNormal, GetActorForwardVector());
-        if (dot < -0.1f && dot > -0.8f)
+        if (dot < -0.1f && dot > -0.9f)
         {
-            return true;
+            FVector WallVector = FVector::CrossProduct(RightWallHit.ImpactNormal, FVector::UpVector);
+            WallVector.Normalize();
+            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
         }
     }
-    return false;
-}
-
-void AS_Player::WallRun()
-{
-    UE_LOG(LogTemp, Warning, TEXT("WALL RUNNING"));
+    return FVector::ZeroVector;
 }
 
 void AS_Player::Tick(float DeltaTime)
@@ -170,31 +191,63 @@ void AS_Player::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     UpdateStates(DeltaTime);
 
-    FVector display = FVector(Player->Velocity.X, Player->Velocity.Y, 0.f);
-    if (display.Length() > 600.f)
-        UE_LOG(LogTemp, Warning, TEXT("%f"), display.Length());
+    if (!(action == ATTACK || (action != PARRY && ParryCD < 0.f && DashCD < 0.f))) { UE_LOG(LogTemp, Warning, TEXT("----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Dash")); }
 
-    if (IsDashing)
+    if (!(action != DASH && ParryCD < 0.f)) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Parry")); }
+
+    if (!(action != PARRY && ParryCD < 0.f && AttackCD < 0.f)) { UE_LOG(LogTemp, Warning, TEXT("------")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Attack")); }
+
+    if (!IsWallRunning) { UE_LOG(LogTemp, Warning, TEXT("------")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("WALLRUN")); }
+
+    if (action == DASH)
         Player->Velocity = Player->Velocity * FVector::UpVector + DashVelocity * FVector(1, 1, 0);
+
+    else if (IsWallRunning)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WALLRUN"));
+        FVector WallRunDirection = GetWallRunDirection();
+        if (WallRunDirection == FVector::ZeroVector)
+        {
+            IsWallRunning = false;
+            return;
+        }
+
+        FVector NewVelocity = WallRunDirection * WallRunVelocity;
+        NewVelocity.Z = (Player->Velocity.Z < 0) ? 0 : Player->Velocity.Z;
+        Player->Velocity = NewVelocity;
+    }
 }
 
 void AS_Player::UpdateStates(float DeltaTime)
 {
+    DashCD -= DeltaTime;
+    ParryCD -= DeltaTime;
+    AttackCD -= DeltaTime;
+
+    // Dash
     if (DashTime > 0.f)
     {
         DashTime -= DeltaTime;
+        Player->BrakingDecelerationWalking = 0.f;
     }
-    else if (IsDashing)
+    else if (action == DASH)
     {
-        CanMove = true;
-        IsDashing = false;
+        action = NONE;
         Player->SetJumpAllowed(true);
         Player->BrakingDecelerationWalking = Deceleration;
     }
 
-    DashCD > 0.f ? DashCD -= DeltaTime : CanDash = true;
-    ParryCD > 0.f ? ParryCD -= DeltaTime : CanParry = true;
-    AttackCD > 0.f ? AttackCD -= DeltaTime : CanAttack = true;
+    // Parry
+    if (ParryTime > 0.f) ParryTime -= DeltaTime;
+    else if (action == PARRY) action = NONE;
+
+    // Attack
+    if (AttackTime > 0.f) AttackTime -= DeltaTime;
+    else if (action == ATTACK) action = NONE;
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -203,12 +256,13 @@ void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
     {
-        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AS_Player::Move);
-        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &AS_Player::MoveCancel);
-        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AS_Player::Look);
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AS_Player::JumpButton);
-        EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &AS_Player::Dash);
-        EnhancedInputComponent->BindAction(ParryAction, ETriggerEvent::Started, this, &AS_Player::Parry);
-        EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &AS_Player::Attack);
+        EnhancedInputComponent->BindAction(MoveAction,   ETriggerEvent::Triggered, this, &AS_Player::Move);
+        EnhancedInputComponent->BindAction(MoveAction,   ETriggerEvent::Completed, this, &AS_Player::MoveCancel);
+        EnhancedInputComponent->BindAction(LookAction,   ETriggerEvent::Triggered, this, &AS_Player::Look);
+        EnhancedInputComponent->BindAction(JumpAction,   ETriggerEvent::Started,   this, &AS_Player::JumpButton);
+        EnhancedInputComponent->BindAction(DashAction,   ETriggerEvent::Started,   this, &AS_Player::Dash);
+        EnhancedInputComponent->BindAction(ParryAction,  ETriggerEvent::Started,   this, &AS_Player::Parry);
+        EnhancedInputComponent->BindAction(ParryAction,  ETriggerEvent::Completed, this, &AS_Player::ParryCancel);
+        EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started,   this, &AS_Player::Attack);
     }
 }
