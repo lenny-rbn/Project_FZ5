@@ -27,8 +27,14 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		UCameraComponent* Camera;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+        float WallCheckDistance;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+        float MaxWallRunTime;
+
 	bool IsDashing;
 	bool IsSliding;
+    bool IsWallRunning;
 
 	float DashCD;
 	float ParryCD;
@@ -41,6 +47,12 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float ShootTime;
 	float SlashTime;
 	float SwitchTime;
+
+	float WallRunTimer;
+	float WallRunVelocity;
+
+    FHitResult LeftWallHit;
+    FHitResult RightWallHit;
 
 	State state;
 	Action action;
@@ -59,6 +71,9 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanParry();
 	bool CanShoot();
 	bool CanSlash();
+	bool CanWallRun();
+
+	FVector GetWallRunDirection();
 
 protected:
 	virtual void BeginPlay() override;
@@ -93,9 +108,10 @@ protected:
 	void Dash(const FInputActionValue& Value);
 	void Parry(const FInputActionValue& Value);
 	void Attack(const FInputActionValue& Value);
-	void TakeSword(const FInputActionValue& Value);
 	void TakeGun1(const FInputActionValue& Value);
 	void TakeGun2(const FInputActionValue& Value);
+	void TakeSword(const FInputActionValue& Value);
+	void JumpButton(const FInputActionValue& Value);
 
 public:
 	AS_Player();

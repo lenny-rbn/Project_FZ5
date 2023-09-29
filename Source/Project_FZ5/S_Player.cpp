@@ -51,6 +51,8 @@ void AS_Player::BeginPlay()
     action = NONE;
     item = SWORD;
 
+    IsWallRunning = false;
+
     Player = GetCharacterMovement();
 }
 
@@ -81,7 +83,7 @@ bool AS_Player::CanSlash()
 
 void AS_Player::Move(const FInputActionValue& Value)
 {
-    if (action != DASH && !IsSliding)
+    if (action != DASH && !IsSliding && !IsWallRunning)
     {
         MoveDir = Value.Get<FVector2D>();
         MoveDir.Normalize();
@@ -189,6 +191,54 @@ void AS_Player::TakeGun2(const FInputActionValue& Value)
     item = GUN;
 }
 
+void AS_Player::JumpButton(const FInputActionValue& Value)
+{
+    if (IsWallRunning)
+    {
+        IsWallRunning = false;
+    }
+    else if (CanWallRun())
+    {
+        IsWallRunning = true;
+        WallRunVelocity = Player->Velocity.Size2D();
+    }
+    Jump();
+}
+
+bool AS_Player::CanWallRun()
+{
+    return action == NONE && GetWallRunDirection() != FVector::ZeroVector;
+}
+
+FVector AS_Player::GetWallRunDirection()
+{
+    FVector PlayerLocation = GetActorLocation();
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+    if (GetWorld()->LineTraceSingleByChannel(LeftWallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    {
+        float dot = FVector::DotProduct(LeftWallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.9f)
+        {
+            FVector WallVector = FVector::CrossProduct(LeftWallHit.ImpactNormal, FVector::UpVector);
+            WallVector.Normalize();
+            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
+        }
+    }
+    else if (GetWorld()->LineTraceSingleByChannel(RightWallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    {
+        float dot = FVector::DotProduct(RightWallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.9f)
+        {
+            FVector WallVector = FVector::CrossProduct(RightWallHit.ImpactNormal, FVector::UpVector);
+            WallVector.Normalize();
+            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
+        }
+    }
+    return FVector::ZeroVector;
+}
+
 void AS_Player::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
@@ -209,8 +259,26 @@ void AS_Player::Tick(float DeltaTime)
     if (!CanSlash()) { UE_LOG(LogTemp, Warning, TEXT("------")); }
     else { UE_LOG(LogTemp, Warning, TEXT("Slash")); }
 
+    if (!IsWallRunning) { UE_LOG(LogTemp, Warning, TEXT("------")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }
+
     if (IsDashing)
+    {
         Player->Velocity = Player->Velocity * FVector::UpVector + DashVelocity * FVector(1, 1, 0);
+    }
+    else if (IsWallRunning)
+    {
+        FVector WallRunDirection = GetWallRunDirection();
+        if (WallRunDirection == FVector::ZeroVector)
+        {
+            IsWallRunning = false;
+            return;
+        }
+
+        FVector NewVelocity = WallRunDirection * WallRunVelocity;
+        NewVelocity.Z = (Player->Velocity.Z < 0.f) ? 0.f : Player->Velocity.Z;
+        Player->Velocity = NewVelocity;
+    }
 }
 
 void AS_Player::UpdateStates(float DeltaTime)
@@ -262,7 +330,7 @@ void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
         EnhancedInputComponent->BindAction(MoveAction,      ETriggerEvent::Triggered, this, &AS_Player::Move);
         EnhancedInputComponent->BindAction(MoveAction,      ETriggerEvent::Completed, this, &AS_Player::MoveCancel);
         EnhancedInputComponent->BindAction(LookAction,      ETriggerEvent::Triggered, this, &AS_Player::Look);
-        EnhancedInputComponent->BindAction(JumpAction,      ETriggerEvent::Started,   this, &AS_Player::Jump);
+        EnhancedInputComponent->BindAction(JumpAction,      ETriggerEvent::Started,   this, &AS_Player::JumpButton);
         EnhancedInputComponent->BindAction(DashAction,      ETriggerEvent::Started,   this, &AS_Player::Dash);
         EnhancedInputComponent->BindAction(DashAction,      ETriggerEvent::Completed, this, &AS_Player::SlideCancel);
         EnhancedInputComponent->BindAction(ParryAction,     ETriggerEvent::Started,   this, &AS_Player::Parry);
