@@ -46,6 +46,7 @@ void AS_Player::BeginPlay()
     ShootTime = 0.f;
     SlashTime = 0.f;
     SwitchTime = 0.f;
+    WallRunTime = 0.f;
 
     state = GROUNDED;
     action = NONE;
@@ -200,6 +201,7 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     else if (CanWallRun())
     {
         IsWallRunning = true;
+        WallRunTime = MaxWallRunTime;
         WallRunVelocity = Player->Velocity.Size2D();
     }
     Jump();
@@ -319,6 +321,10 @@ void AS_Player::UpdateStates(float DeltaTime)
     // Switch
     if (SwitchTime > 0.f) SwitchTime -= DeltaTime;
     else if (action == SWITCH) action = NONE;
+
+    // WallRun
+    if (WallRunTime > 0.f) WallRunTime -= DeltaTime;
+    else if (IsWallRunning) IsWallRunning = false;
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

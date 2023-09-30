@@ -48,7 +48,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float SlashTime;
 	float SwitchTime;
 
-	float WallRunTimer;
+	float WallRunTime;
 	float WallRunVelocity;
 
     FHitResult LeftWallHit;
