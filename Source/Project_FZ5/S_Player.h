@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "InputActionValue.h"
+#include "Engine/EngineTypes.h"
 #include "GameFramework/Character.h"
 
 #include "S_Player.generated.h"
@@ -10,11 +11,11 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 
-enum State { GROUNDED, JUMPING, FALLING, WALLRUN };
-
-enum Action { NONE, DASH, SLIDE, SWITCH, PARRY, SLASH, SHOOT, SPECIAL };
-
 enum Item { SWORD, GUN, HEAL, UTIL };
+
+enum State { NEUTRAL, DASH, SLIDE, WALLRUN };
+
+enum Action { NONE, SWITCH, SLASH, SHOOT, PARRY, GEAR };
 
 UCLASS()
 class PROJECT_FZ5_API AS_Player : public ACharacter
@@ -27,44 +28,77 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		UCameraComponent* Camera;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown", meta = (AllowPrivateAccess = "true"))
+		float DashCooldown;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown", meta = (AllowPrivateAccess = "true"))
+		float ParryCooldown;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown", meta = (AllowPrivateAccess = "true"))
+		float ShootCooldown;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown", meta = (AllowPrivateAccess = "true"))
+		float SlashCooldown;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration", meta = (AllowPrivateAccess = "true"))
+		float DashingTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration", meta = (AllowPrivateAccess = "true"))
+		float ParryingTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration", meta = (AllowPrivateAccess = "true"))
+		float ShootingTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration", meta = (AllowPrivateAccess = "true"))
+		float SlashingTime;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
+		float DashSpeed;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
+		float Deceleration;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
+		float SlideDeceleration;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
         float WallCheckDistance;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
         float MaxWallRunTime;
 
-	bool IsDashing;
-	bool IsSliding;
-    bool IsWallRunning;
+	bool IsDashUp;
+	bool IsSlideUp;
+	bool IsWallRunUp;
 
-	float DashCD;
-	float ParryCD;
-	float ShootCD;
-	float SlashCD;
-	float SwitchCD;
+	bool IsGearUp;
+	bool IsShootUp;
+	bool IsSlashUp;
+	bool IsParryUp;
+	bool IsSwitchUp;
 
-	float DashTime;
-	float ParryTime;
-	float ShootTime;
-	float SlashTime;
-	float SwitchTime;
-
-	float WallRunTime;
 	float WallRunVelocity;
 
-    FHitResult LeftWallHit;
-    FHitResult RightWallHit;
-
+	Item item;
 	State state;
 	Action action;
-	Item item;
 
 	FRotator Yaw;
 	FVector2D MoveDir;
 	FVector DashVelocity;
 
+    FHitResult LeftWallHit;
+    FHitResult RightWallHit;
+
+	FTimerHandle DashHandler;
+	FTimerHandle ParryHandler;
+	FTimerHandle ShootHandler;
+	FTimerHandle SlashHandler;
+	FTimerHandle SwitchHandler;
+	FTimerHandle WallRunHandler;
+
 	UCharacterMovementComponent* Player;
 
 	void UpdateStates(float DeltaTime);
+	void UpdateStateCooldown(State state);
+	void UpdateActionCooldown(Action action);
+
+	void StopDash();
+	void StopSlash();
+	void StopShoot();
+	void StopParry();
+	void StopWallrun();
 
 	bool CanDash();
 	bool CanSlide();
@@ -115,31 +149,6 @@ protected:
 
 public:
 	AS_Player();
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement")
-		float DashSpeed;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement")
-		float Deceleration;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement")
-		float SlideDeceleration;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration")
-		float DashingTime;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration")
-		float ParryingTime;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration")
-		float ShootingTime;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration")
-		float SlashingTime;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown")
-		float DashCooldown;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown")
-		float ParryCooldown;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown")
-		float ShootCooldown;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Cooldown")
-		float SlashCooldown;
 
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
