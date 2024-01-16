@@ -10,9 +10,9 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 
-enum State { GROUNDED, JUMPING, FALLING, WALLRUN };
+enum State { GROUNDED, JUMPING, FALLING, WALLRUN, WALLCLIMB };
 
-enum Action { NONE, DASH, SLIDE, SWITCH, PARRY, SLASH, SHOOT, SPECIAL };
+enum Action { NONE, DASH, SLIDE, SWITCH, PARRY, SLASH, SHOOT, SPECIAL, WALLJUMPING};
 
 enum Item { SWORD, GUN, HEAL, UTIL };
 
@@ -34,7 +34,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 
 	bool IsDashing;
 	bool IsSliding;
-    bool IsWallRunning;
+	bool IsWallRunning;
 
 	float DashCD;
 	float ParryCD;
@@ -51,8 +51,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float WallRunTime;
 	float WallRunVelocity;
 
-    FHitResult LeftWallHit;
-    FHitResult RightWallHit;
+    FHitResult WallHit;
+
 
 	State state;
 	Action action;
@@ -72,6 +72,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanShoot();
 	bool CanSlash();
 	bool CanWallRun();
+
+	void ResetAction();
 
 	FVector GetWallRunDirection();
 
