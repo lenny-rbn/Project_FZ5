@@ -71,6 +71,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float WallRunVelocity;
 
 	Item item;
+
 	State state;
 	Action action;
 
