@@ -35,8 +35,13 @@ void AS_Player::BeginPlay()
     }
 
     IsDashUp = true;
+    IsSlideUp = true;
+    IsWallRunUp = true;
+
+    IsGearUp = true;
     IsShootUp = true;
     IsSlashUp = true;
+    IsParryUp = true;
     IsSwitchUp = true;
 
     item = SWORD;
@@ -48,7 +53,7 @@ void AS_Player::BeginPlay()
 
 bool AS_Player::CanDash()
 {
-    return item == SWORD && state != WALLRUN && (action == SLASH || (IsDashUp && action != PARRY && IsParryUp));
+    return item == SWORD && state != WALLRUN && IsDashUp && action != PARRY && IsParryUp;
 }
 
 bool AS_Player::CanSlide()
@@ -73,7 +78,7 @@ bool AS_Player::CanSlash()
 
 bool AS_Player::CanWallRun()
 {
-    return action == NONE && GetWallRunDirection() != FVector::ZeroVector;
+    return GetWallRunDirection() != FVector::ZeroVector;
 }
 
 void AS_Player::Move(const FInputActionValue& Value)
@@ -141,7 +146,7 @@ void AS_Player::StopDash()
     Player->SetJumpAllowed(true);
 
     FTimerHandle DashCDHandler;
-    FTimerDelegate DashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::UpdateStateCooldown, DASH);
+    FTimerDelegate DashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowState, DASH);
     GetWorld()->GetTimerManager().SetTimer(DashCDHandler, DashDelegate, DashCooldown, false);
 }
 
@@ -160,7 +165,7 @@ void AS_Player::Parry(const FInputActionValue& Value)
     if (CanParry())
     {
         action = PARRY;
-
+        IsParryUp = false;
         GetWorld()->GetTimerManager().SetTimer(ParryHandler, this, &AS_Player::StopParry, ParryingTime);
     }
 }
@@ -170,7 +175,7 @@ void AS_Player::StopParry()
     if (action == PARRY) action = NONE;
 
     FTimerHandle ParryCDHandler;
-    FTimerDelegate ParryDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::UpdateActionCooldown, PARRY);
+    FTimerDelegate ParryDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, PARRY);
     GetWorld()->GetTimerManager().SetTimer(ParryCDHandler, ParryDelegate, ParryCooldown, false);
 }
 
@@ -185,12 +190,15 @@ void AS_Player::Attack(const FInputActionValue& Value)
     if (CanSlash())
     {
         action = SLASH;
-        GetWorld()->GetTimerManager().SetTimer(DashHandler, this, &AS_Player::StopDash, SlashingTime);
+        IsDashUp = true;
+        IsSlashUp = false;
+        GetWorld()->GetTimerManager().SetTimer(SlashHandler, this, &AS_Player::StopSlash, SlashingTime);
     }
     else if (CanShoot())
     {
         action = SLASH;
-        GetWorld()->GetTimerManager().SetTimer(DashHandler, this, &AS_Player::StopDash, ShootingTime);
+        IsShootUp = false;
+        GetWorld()->GetTimerManager().SetTimer(ShootHandler, this, &AS_Player::StopShoot, ShootingTime);
     }
 }
 
@@ -199,7 +207,7 @@ void AS_Player::StopSlash()
     if (action == SLASH) action = NONE;
 
     FTimerHandle SlashCDHandler;
-    FTimerDelegate SlashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::UpdateActionCooldown, SLASH);
+    FTimerDelegate SlashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, SLASH);
     GetWorld()->GetTimerManager().SetTimer(SlashCDHandler, SlashDelegate, SlashCooldown, false);
 }
 
@@ -208,7 +216,7 @@ void AS_Player::StopShoot()
     if (action == SHOOT) action = NONE;
 
     FTimerHandle ShootCDHandler;
-    FTimerDelegate ShootDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::UpdateActionCooldown, SHOOT);
+    FTimerDelegate ShootDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, SHOOT);
     GetWorld()->GetTimerManager().SetTimer(ShootCDHandler, ShootDelegate, ShootCooldown, false);
 }
 
@@ -233,6 +241,11 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     {
         WallRunHandler.Invalidate();
         StopWallrun();
+        FVector jumpDirection = WallHit.ImpactNormal + FVector::UpVector;
+        jumpDirection.Normalize();
+        Player->AddImpulse(jumpDirection * 100000.0f);
+        FTimerHandle Handler;
+        GetWorld()->GetTimerManager().SetTimer(Handler, this, &AS_Player::ResetAction, 1.0f);
     }
     else if (CanWallRun())
     {
@@ -245,32 +258,47 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
         Jump();
 }
 
+void AS_Player::ResetAction()
+{
+    action = NONE;
+}
+
 FVector AS_Player::GetWallRunDirection()
 {
     FVector PlayerLocation = GetActorLocation();
 
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
-    if (GetWorld()->LineTraceSingleByChannel(LeftWallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
-        float dot = FVector::DotProduct(LeftWallHit.ImpactNormal, GetActorForwardVector());
-        if (dot < -0.1f && dot > -0.9f)
+        float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.7f)
         {
-            FVector WallVector = FVector::CrossProduct(LeftWallHit.ImpactNormal, FVector::UpVector);
+            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
             WallVector.Normalize();
             return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
         }
     }
-    else if (GetWorld()->LineTraceSingleByChannel(RightWallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
+    else if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
-        float dot = FVector::DotProduct(RightWallHit.ImpactNormal, GetActorForwardVector());
-        if (dot < -0.1f && dot > -0.9f)
+        float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
+        if (dot < -0.1f && dot > -0.7f)
         {
-            FVector WallVector = FVector::CrossProduct(RightWallHit.ImpactNormal, FVector::UpVector);
+            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
             WallVector.Normalize();
             return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
         }
     }
+    /*else if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorForwardVector() * WallCheckDistance, ECC_Visibility, Params))
+    {
+        float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
+        if (dot >= -0.7f)
+        {
+            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
+            WallVector.Normalize();
+            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
+        }
+    }*/
     return FVector::ZeroVector;
 }
 
@@ -302,7 +330,7 @@ void AS_Player::UpdateStates(float DeltaTime)
     }
 }
 
-void AS_Player::UpdateStateCooldown(State request)
+void AS_Player::AllowState(State request)
 {
     switch (request)
     {
@@ -320,7 +348,7 @@ void AS_Player::UpdateStateCooldown(State request)
     }
 }
 
-void AS_Player::UpdateActionCooldown(Action request)
+void AS_Player::AllowAction(Action request)
 {
     switch (request)
     {
@@ -348,6 +376,24 @@ void AS_Player::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     UpdateStates(DeltaTime);
+    
+    if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Dash")); }
+
+    if (!CanSlide()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Slide")); }
+
+    if (!CanParry()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Parry")); }
+
+    if (!CanShoot()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Shoot")); }
+
+    if (!CanSlash()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Slash")); }
+
+    if (!CanWallRun()) { UE_LOG(LogTemp, Warning, TEXT("--------")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

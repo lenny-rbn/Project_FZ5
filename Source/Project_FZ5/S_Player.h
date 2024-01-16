@@ -78,6 +78,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	FVector2D MoveDir;
 	FVector DashVelocity;
 
+    FHitResult WallHit;
     FHitResult LeftWallHit;
     FHitResult RightWallHit;
 
@@ -91,8 +92,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UCharacterMovementComponent* Player;
 
 	void UpdateStates(float DeltaTime);
-	void UpdateStateCooldown(State state);
-	void UpdateActionCooldown(Action action);
+	void AllowState(State state);
+	void AllowAction(Action action);
 
 	void StopDash();
 	void StopSlash();
@@ -106,6 +107,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanShoot();
 	bool CanSlash();
 	bool CanWallRun();
+
+	void ResetAction();
 
 	FVector GetWallRunDirection();
 
