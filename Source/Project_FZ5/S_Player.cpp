@@ -34,6 +34,8 @@ void AS_Player::BeginPlay()
         }
     }
 
+    IsMoving = false;
+
     IsDashUp = true;
     IsSlideUp = true;
     IsWallRunUp = true;
@@ -78,13 +80,14 @@ bool AS_Player::CanSlash()
 
 bool AS_Player::CanWallRun()
 {
-    return GetWallRunDirection() != FVector::ZeroVector;
+    return IsMoving && GetWallRunDirection() != FVector::ZeroVector && !(state == DASH && Player->IsMovingOnGround());
 }
 
 void AS_Player::Move(const FInputActionValue& Value)
 {
     if (state == NEUTRAL)
     {
+        IsMoving = true;
         MoveDir = Value.Get<FVector2D>();
         MoveDir.Normalize();
         Yaw = FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f);
@@ -96,6 +99,7 @@ void AS_Player::Move(const FInputActionValue& Value)
 
 void AS_Player::MoveCancel()
 {
+    IsMoving = false;
     MoveDir = FVector2D(0, 1);
 }
 
@@ -251,7 +255,11 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     {
         state = WALLRUN;
         GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallrun, MaxWallRunTime);
-        WallRunVelocity = Player->Velocity.Size2D();
+
+        if (Player->Velocity.Size2D() < Player->MaxWalkSpeed)
+            WallRunVelocity = 600.f;
+        else
+            WallRunVelocity = Player->Velocity.Size2D();
     }
 
     if (CanJump())
