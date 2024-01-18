@@ -55,6 +55,87 @@ void AS_Player::BeginPlay()
     Player = GetCharacterMovement();
 }
 
+#pragma region ENUM...
+void AS_Player::ResetAction()
+{
+    action = NONE;
+}
+
+void AS_Player::AllowState(State request)
+{
+    switch (request)
+    {
+    case DASH:
+        IsDashUp = true;
+        break;
+    case SLIDE:
+        IsSlideUp = true;
+        break;
+    case WALLRUN:
+        IsWallRunUp = true;
+        break;
+    default:
+        break;
+    }
+}
+
+void AS_Player::AllowAction(Action request)
+{
+    switch (request)
+    {
+    case SWITCH:
+        IsSwitchUp = true;
+        break;
+    case SLASH:
+        IsSlashUp = true;
+        break;
+    case SHOOT:
+        IsShootUp = true;
+        break;
+    case PARRY:
+        IsParryUp = true;
+        break;
+    case GEAR:
+        IsGearUp = true;
+        break;
+    default:
+        break;
+    }
+}
+
+void AS_Player::AddStateCooldown(State State, float Cooldown)
+{
+    FTimerHandle NewHandler;
+    FTimerDelegate NewDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowState, State);
+    GetWorld()->GetTimerManager().SetTimer(NewHandler, NewDelegate, Cooldown, false);
+}
+
+void AS_Player::AddActionCooldown(Action Action, float Cooldown)
+{
+    FTimerHandle NewHandler;
+    FTimerDelegate NewDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, Action);
+    GetWorld()->GetTimerManager().SetTimer(NewHandler, NewDelegate, Cooldown, false);
+}
+#pragma endregion
+
+#pragma region INVENTORY...
+void AS_Player::TakeSword(const FInputActionValue& Value)
+{
+    item = SWORD;
+}
+
+void AS_Player::TakeGun1(const FInputActionValue& Value)
+{
+    item = GUN;
+}
+
+void AS_Player::TakeGun2(const FInputActionValue& Value)
+{
+    item = GUN;
+}
+#pragma endregion
+
+#pragma region CONDITIONS...
 bool AS_Player::CanDash()
 {
     return item == SWORD && (state == NEUTRAL || !IsSlashUp) && IsDashUp && IsParryUp;
@@ -85,11 +166,18 @@ bool AS_Player::CanWallRun()
     return IsMoving && GetWallRunDirection() != FVector::ZeroVector && !(state == DASH && Player->IsMovingOnGround());
 }
 
-bool AS_Player::CanWallClimb()
+bool AS_Player::CanWallJump()
 {
-    return IsMoving && GetWallClimbDirection() != FVector::ZeroVector && (Player->IsMovingOnGround() || WallReset);
+    return state == WALLRUN || state == WALLCLIMB || (WallReset && GetWallClimbDirection() != FVector::ZeroVector);
 }
 
+bool AS_Player::CanWallClimb()
+{
+    return IsMoving && GetWallClimbDirection() != FVector::ZeroVector && Player->IsMovingOnGround();
+}
+#pragma endregion
+
+#pragma region MOVE...
 void AS_Player::MoveStart()
 {
     IsMoving = true;
@@ -124,7 +212,9 @@ void AS_Player::Look(const FInputActionValue& Value)
         AddControllerPitchInput(LookAxisValue.Y);
     }
 }
+#pragma endregion
 
+#pragma region DASH INPUT...
 void AS_Player::Dash(const FInputActionValue& Value)
 {
     if (CanDash())
@@ -148,10 +238,6 @@ void AS_Player::Dash(const FInputActionValue& Value)
     else if (CanSlide())
     {
         state = SLIDE;
-
-        if (Player->IsMovingOnGround())
-            Player->SetJumpAllowed(false);
-
         Player->BrakingDecelerationWalking = SlideDeceleration;
     }
 }
@@ -162,9 +248,7 @@ void AS_Player::StopDash()
     Player->BrakingDecelerationWalking = Deceleration;
     Player->SetJumpAllowed(true);
 
-    FTimerHandle DashCDHandler;
-    FTimerDelegate DashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowState, DASH);
-    GetWorld()->GetTimerManager().SetTimer(DashCDHandler, DashDelegate, DashCooldown, false);
+    AddStateCooldown(DASH, DashCooldown);
 }
 
 void AS_Player::SlideCancel()
@@ -176,7 +260,9 @@ void AS_Player::SlideCancel()
         Player->SetJumpAllowed(true);
     }
 }
+#pragma endregion
 
+#pragma region PARRY INPUT...
 void AS_Player::Parry(const FInputActionValue& Value)
 {
     if (CanParry())
@@ -190,10 +276,7 @@ void AS_Player::Parry(const FInputActionValue& Value)
 void AS_Player::StopParry()
 {
     if (action == PARRY) action = NONE;
-
-    FTimerHandle ParryCDHandler;
-    FTimerDelegate ParryDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, PARRY);
-    GetWorld()->GetTimerManager().SetTimer(ParryCDHandler, ParryDelegate, ParryCooldown, false);
+    AddActionCooldown(PARRY, ParryCooldown);
 }
 
 void AS_Player::ParryCancel()
@@ -201,7 +284,9 @@ void AS_Player::ParryCancel()
     ParryHandler.Invalidate();
     StopParry();
 }
+#pragma endregion
 
+#pragma region ATTACK INPUT...
 void AS_Player::Attack(const FInputActionValue& Value)
 {
     if (CanSlash())
@@ -225,48 +310,32 @@ void AS_Player::Attack(const FInputActionValue& Value)
 void AS_Player::StopSlash()
 {
     if (action == SLASH) action = NONE;
-
-    FTimerHandle SlashCDHandler;
-    FTimerDelegate SlashDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, SLASH);
-    GetWorld()->GetTimerManager().SetTimer(SlashCDHandler, SlashDelegate, SlashCooldown, false);
+    AddActionCooldown(SLASH, SlashCooldown);
 }
 
 void AS_Player::StopShoot()
 {
     if (action == SHOOT) action = NONE;
-
-    FTimerHandle ShootCDHandler;
-    FTimerDelegate ShootDelegate = FTimerDelegate::CreateUObject(this, &AS_Player::AllowAction, SHOOT);
-    GetWorld()->GetTimerManager().SetTimer(ShootCDHandler, ShootDelegate, ShootCooldown, false);
+    AddActionCooldown(SHOOT, ShootCooldown);
 }
+#pragma endregion
 
-void AS_Player::TakeSword(const FInputActionValue& Value)
-{
-    item = SWORD;
-}
-
-void AS_Player::TakeGun1(const FInputActionValue& Value)
-{
-    item = GUN;
-}
-
-void AS_Player::TakeGun2(const FInputActionValue& Value)
-{
-    item = GUN;
-}
-
+#pragma region JUMP INPUT...
 void AS_Player::JumpButton(const FInputActionValue& Value)
 {
-    if (state == WALLRUN || state == WALLCLIMB)
+    if (CanWallJump())
     {
         StopWallRun();
         StopWallClimb();
         state = WALLJUMP;
+        if (WallReset) Player->Velocity = FVector::UpVector * 600.f;
+        else Player->Velocity.Z = 0.f;
         IsDashUp = false;
+        WallReset = false;
         LastWallHit = WallHit;
         FVector JumpDir = WallHit.ImpactNormal + FVector::UpVector;
         JumpDir.Normalize();
-        Player->AddImpulse(JumpDir * 100000.0f);
+        Player->AddImpulse(JumpDir * WallForce);
         GetWorld()->GetTimerManager().SetTimer(WallJumpHandler, this, &AS_Player::StopWallJump, WallJumpTime);
     }
     else if (CanWallRun())
@@ -303,11 +372,18 @@ void AS_Player::StopWallJump()
     }
 }
 
-void AS_Player::ResetAction()
+void AS_Player::StopWallRun()
 {
-    action = NONE;
+    if (state == WALLRUN) state = NEUTRAL;
 }
 
+void AS_Player::StopWallClimb()
+{
+    if (state == WALLCLIMB) state = NEUTRAL;
+}
+#pragma endregion
+
+#pragma region WALLRIDE...
 FVector AS_Player::SetWallVector()
 {
     FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
@@ -356,34 +432,18 @@ FVector AS_Player::GetWallClimbDirection()
 
     return FVector::ZeroVector;
 }
-
-void AS_Player::StopWallRun()
-{
-    if (state == WALLRUN) state = NEUTRAL;
-}
-
-void AS_Player::StopWallClimb()
-{
-    if (state == WALLCLIMB) state = NEUTRAL;
-}
-
-void AS_Player::Landed(const FHitResult& Hit)
-{
-    Super::Landed(Hit);
-    LastWallHit = Hit;
-}
+#pragma endregion
 
 void AS_Player::UpdateStates(float DeltaTime)
 {
-    // Movement
     if (state == DASH)
     {
         Player->Velocity = Player->Velocity * FVector::UpVector + DashVelocity * FVector(1, 1, 0);
     }
     else if (state == WALLRUN)
     {
-        FVector WallRunDirection = GetWallRunDirection();
-        if (WallRunDirection == FVector::ZeroVector)
+        FVector Dir = GetWallRunDirection();
+        if (Dir == FVector::ZeroVector)
         {
             LastWallHit = WallHit;
             WallRunHandler.Invalidate();
@@ -391,64 +451,31 @@ void AS_Player::UpdateStates(float DeltaTime)
             return;
         }
 
-        FVector NewVelocity = WallRunDirection * WallVelocity;
+        FVector NewVelocity = Dir * WallVelocity;
         NewVelocity.Z = (Player->Velocity.Z <= 0.f) ? 0.f : Player->Velocity.Z;
         Player->Velocity = NewVelocity;
+
+        Player->AddForce(-WallHit.ImpactNormal * WallForce);
     }
     else if (state == WALLCLIMB)
     {
-        FVector WallClimbDirection = GetWallClimbDirection();
-        if (WallClimbDirection == FVector::ZeroVector)
+        FVector Dir = GetWallClimbDirection();
+        if (Dir == FVector::ZeroVector)
         {
             WallRunHandler.Invalidate();
             StopWallClimb();
             return;
         }
 
-        Player->Velocity = WallClimbDirection * WallVelocity;
+        Player->Velocity = Dir * WallVelocity;
     }
 }
 
-void AS_Player::AllowState(State request)
+void AS_Player::Landed(const FHitResult& Hit)
 {
-    switch (request)
-    {
-    case DASH:
-        IsDashUp = true;
-        break;
-    case SLIDE:
-        IsSlideUp = true;
-        break;
-    case WALLRUN:
-        IsWallRunUp = true;
-        break;
-    default:
-        break;
-    }
-}
-
-void AS_Player::AllowAction(Action request)
-{
-    switch (request)
-    {
-    case SWITCH:
-        IsSwitchUp = true;
-        break;
-    case SLASH:
-        IsSlashUp = true;
-        break;
-    case SHOOT:
-        IsShootUp = true;
-        break;
-    case PARRY:
-        IsParryUp = true;
-        break;
-    case GEAR:
-        IsGearUp = true;
-        break;
-    default:
-        break;
-    }
+    Super::Landed(Hit);
+    LastWallHit = Hit;
+    WallReset = false;
 }
 
 void AS_Player::Tick(float DeltaTime)
@@ -456,7 +483,7 @@ void AS_Player::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     UpdateStates(DeltaTime);
     
-    /*if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
+    if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
     else { UE_LOG(LogTemp, Warning, TEXT("Dash")); }
 
     if (!CanSlide()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
@@ -470,12 +497,6 @@ void AS_Player::Tick(float DeltaTime)
 
     if (!CanSlash()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
     else { UE_LOG(LogTemp, Warning, TEXT("Slash")); }
-
-    if (!CanWallRun()) { UE_LOG(LogTemp, Warning, TEXT("--------")); }
-    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }*/
-
-    if (state != WALLCLIMB) { UE_LOG(LogTemp, Warning, TEXT("---------")); }
-    else { UE_LOG(LogTemp, Warning, TEXT("WALLCLIMB")); }
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

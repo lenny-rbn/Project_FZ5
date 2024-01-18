@@ -61,6 +61,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
         float MaxWallClimbTime;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
 		float WallJumpTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
+		float WallForce;
 
 	bool IsMoving;
 
@@ -79,7 +81,6 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	float WallVelocity;
 
 	Item item;
-
 	State state;
 	Action action;
 
@@ -102,8 +103,10 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UCharacterMovementComponent* Player;
 
 	void UpdateStates(float DeltaTime);
-	void AllowState(State state);
-	void AllowAction(Action action);
+	void AllowState(State State);
+	void AllowAction(Action Action);
+	void AddStateCooldown(State State, float Cooldown);
+	void AddActionCooldown(Action Action, float Cooldown);
 
 	void StopDash();
 	void StopSlash();
@@ -119,9 +122,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanShoot();
 	bool CanSlash();
 	bool CanWallRun();
+	bool CanWallJump();
 	bool CanWallClimb();
-
-	void Landed(const FHitResult &Hit) override;
 
 	void ResetAction();
 
@@ -172,5 +174,6 @@ public:
 	AS_Player();
 
 	virtual void Tick(float DeltaTime) override;
+	virtual void Landed(const FHitResult& Hit) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 };
