@@ -65,7 +65,7 @@ bool AS_Player::CanSlide()
 
 bool AS_Player::CanParry()
 {
-    return item == SWORD && state != DASH && IsParryUp;
+    return item == SWORD && state != DASH && IsParryUp && state != WALLJUMP;
 }
 
 bool AS_Player::CanShoot()
@@ -243,18 +243,19 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
 {
     if (state == WALLRUN)
     {
-        WallRunHandler.Invalidate();
-        StopWallrun();
+        StopWallRun();
+        state = WALLJUMP;
+        IsDashUp = false;
         FVector jumpDirection = WallHit.ImpactNormal + FVector::UpVector;
         jumpDirection.Normalize();
         Player->AddImpulse(jumpDirection * 100000.0f);
-        FTimerHandle Handler;
-        GetWorld()->GetTimerManager().SetTimer(Handler, this, &AS_Player::ResetAction, 1.0f);
+        GetWorld()->GetTimerManager().SetTimer(WallJumpHandler, this, &AS_Player::StopWallJump, 1.0f);
     }
     else if (CanWallRun())
     {
         state = WALLRUN;
-        GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallrun, MaxWallRunTime);
+        IsDashUp = true;
+        GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallRun, MaxWallRunTime);
 
         if (Player->Velocity.Size2D() < Player->MaxWalkSpeed)
             WallRunVelocity = 600.f;
@@ -264,6 +265,14 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
 
     if (CanJump())
         Jump();
+}
+
+void AS_Player::StopWallJump()
+{
+    if (state == WALLJUMP) {
+        state = NEUTRAL;
+        IsDashUp = true;
+    }
 }
 
 void AS_Player::ResetAction()
@@ -310,7 +319,7 @@ FVector AS_Player::GetWallRunDirection()
     return FVector::ZeroVector;
 }
 
-void AS_Player::StopWallrun()
+void AS_Player::StopWallRun()
 {
     if (state == WALLRUN) state = NEUTRAL;
 }
@@ -328,7 +337,7 @@ void AS_Player::UpdateStates(float DeltaTime)
         if (WallRunDirection == FVector::ZeroVector)
         {
             WallRunHandler.Invalidate();
-            StopWallrun();
+            StopWallRun();
             return;
         }
 
@@ -385,7 +394,7 @@ void AS_Player::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     UpdateStates(DeltaTime);
     
-    if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
+    /*if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
     else { UE_LOG(LogTemp, Warning, TEXT("Dash")); }
 
     if (!CanSlide()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
@@ -401,7 +410,7 @@ void AS_Player::Tick(float DeltaTime)
     else { UE_LOG(LogTemp, Warning, TEXT("Slash")); }
 
     if (!CanWallRun()) { UE_LOG(LogTemp, Warning, TEXT("--------")); }
-    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }*/
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
