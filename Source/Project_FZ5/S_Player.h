@@ -13,7 +13,7 @@ class UInputAction;
 
 enum Item { SWORD, GUN, HEAL, UTIL };
 
-enum State { NEUTRAL, DASH, SLIDE, WALLRUN, WALLCLIMB };
+enum State { NEUTRAL, DASH, SLIDE, WALLRUN, WALLCLIMB, WALLJUMP };
 
 enum Action { NONE, SWITCH, SLASH, SHOOT, PARRY, GEAR };
 
@@ -91,6 +91,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	FTimerHandle SlashHandler;
 	FTimerHandle SwitchHandler;
 	FTimerHandle WallRunHandler;
+	FTimerHandle WallJumpHandler;
 	FTimerHandle WallClimbHandler;
 
 	UCharacterMovementComponent* Player;
@@ -104,6 +105,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	void StopShoot();
 	void StopParry();
 	void StopWallRun();
+	void StopWallJump();
 	void StopWallClimb();
 
 	bool CanDash();

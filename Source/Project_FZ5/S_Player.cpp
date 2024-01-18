@@ -65,7 +65,7 @@ bool AS_Player::CanSlide()
 
 bool AS_Player::CanParry()
 {
-    return item == SWORD && state != DASH && IsParryUp;
+    return item == SWORD && state != DASH && IsParryUp && state != WALLJUMP;
 }
 
 bool AS_Player::CanShoot()
@@ -248,15 +248,18 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
 {
     if (state == WALLRUN || state == WALLCLIMB)
     {
+        StopWallRun();
+        state = WALLJUMP;
+        IsDashUp = false;
         FVector jumpDirection = WallHit.ImpactNormal + FVector::UpVector;
         jumpDirection.Normalize();
         Player->AddImpulse(jumpDirection * 100000.0f);
-        FTimerHandle Handler;
-        GetWorld()->GetTimerManager().SetTimer(Handler, this, &AS_Player::ResetAction, 1.0f);
+        GetWorld()->GetTimerManager().SetTimer(WallJumpHandler, this, &AS_Player::StopWallJump, 1.0f);
     }
     else if (CanWallRun())
     {
         state = WALLRUN;
+        IsDashUp = true;
         GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallRun, MaxWallRunTime);
 
         if (Player->Velocity.Size2D() < Player->MaxWalkSpeed)
@@ -274,6 +277,14 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
 
     if (CanJump())
         Jump();
+}
+
+void AS_Player::StopWallJump()
+{
+    if (state == WALLJUMP) {
+        state = NEUTRAL;
+        IsDashUp = true;
+    }
 }
 
 void AS_Player::ResetAction()
