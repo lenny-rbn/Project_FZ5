@@ -53,12 +53,14 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
 		float SlideDeceleration;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
         float WallCheckDistance;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
         float MaxWallRunTime;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
         float MaxWallClimbTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Wall", meta = (AllowPrivateAccess = "true"))
+		float WallJumpTime;
 
 	bool IsMoving;
 
@@ -72,6 +74,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool IsParryUp;
 	bool IsSwitchUp;
 
+	bool WallReset;
+
 	float WallVelocity;
 
 	Item item;
@@ -83,7 +87,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	FVector2D MoveDir;
 	FVector DashVelocity;
 
-    FHitResult WallHit;
+	FHitResult WallHit;
+	FHitResult LastWallHit;
 
 	FTimerHandle DashHandler;
 	FTimerHandle ParryHandler;
@@ -116,6 +121,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanWallRun();
 	bool CanWallClimb();
 
+	void Landed(const FHitResult &Hit) override;
+
 	void ResetAction();
 
 	FVector SetWallVector();
@@ -147,6 +154,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
 		UInputAction* TakeGun2Action;
 
+	void MoveStart();
 	void MoveCancel();
 	void ParryCancel();
 	void SlideCancel();

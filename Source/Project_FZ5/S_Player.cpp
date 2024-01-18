@@ -46,6 +46,8 @@ void AS_Player::BeginPlay()
     IsParryUp = true;
     IsSwitchUp = true;
 
+    WallReset = false;
+
     item = SWORD;
     state = NEUTRAL;
     action = NONE;
@@ -55,7 +57,7 @@ void AS_Player::BeginPlay()
 
 bool AS_Player::CanDash()
 {
-    return item == SWORD && state != WALLRUN && IsDashUp && action != PARRY && IsParryUp;
+    return item == SWORD && (state == NEUTRAL || !IsSlashUp) && IsDashUp && IsParryUp;
 }
 
 bool AS_Player::CanSlide()
@@ -85,18 +87,22 @@ bool AS_Player::CanWallRun()
 
 bool AS_Player::CanWallClimb()
 {
-    return IsMoving && GetWallClimbDirection() != FVector::ZeroVector && (Player->IsMovingOnGround() || !IsDashUp);
+    return IsMoving && GetWallClimbDirection() != FVector::ZeroVector && (Player->IsMovingOnGround() || WallReset);
+}
+
+void AS_Player::MoveStart()
+{
+    IsMoving = true;
 }
 
 void AS_Player::Move(const FInputActionValue& Value)
 {
+    MoveDir = Value.Get<FVector2D>();
+    MoveDir.Normalize();
+
     if (state == NEUTRAL)
     {
-        IsMoving = true;
-        MoveDir = Value.Get<FVector2D>();
-        MoveDir.Normalize();
         Yaw = FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f);
-
         AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), MoveDir.Y);
         AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), MoveDir.X);
     }
@@ -123,6 +129,8 @@ void AS_Player::Dash(const FInputActionValue& Value)
 {
     if (CanDash())
     {
+        if (state == WALLJUMP) WallReset = true;
+
         state = DASH;
         IsDashUp = false;
         GetWorld()->GetTimerManager().SetTimer(DashHandler, this, &AS_Player::StopDash, DashingTime);
@@ -209,6 +217,9 @@ void AS_Player::Attack(const FInputActionValue& Value)
         IsShootUp = false;
         GetWorld()->GetTimerManager().SetTimer(ShootHandler, this, &AS_Player::StopShoot, ShootingTime);
     }
+
+    StopWallRun();
+    StopWallClimb();
 }
 
 void AS_Player::StopSlash()
@@ -249,17 +260,20 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     if (state == WALLRUN || state == WALLCLIMB)
     {
         StopWallRun();
+        StopWallClimb();
         state = WALLJUMP;
         IsDashUp = false;
-        FVector jumpDirection = WallHit.ImpactNormal + FVector::UpVector;
-        jumpDirection.Normalize();
-        Player->AddImpulse(jumpDirection * 100000.0f);
-        GetWorld()->GetTimerManager().SetTimer(WallJumpHandler, this, &AS_Player::StopWallJump, 1.0f);
+        LastWallHit = WallHit;
+        FVector JumpDir = WallHit.ImpactNormal + FVector::UpVector;
+        JumpDir.Normalize();
+        Player->AddImpulse(JumpDir * 100000.0f);
+        GetWorld()->GetTimerManager().SetTimer(WallJumpHandler, this, &AS_Player::StopWallJump, WallJumpTime);
     }
     else if (CanWallRun())
     {
         state = WALLRUN;
         IsDashUp = true;
+        WallReset = false;
         GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallRun, MaxWallRunTime);
 
         if (Player->Velocity.Size2D() < Player->MaxWalkSpeed)
@@ -270,6 +284,7 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     else if (CanWallClimb())
     {
         state = WALLCLIMB;
+        WallReset = false;
         GetWorld()->GetTimerManager().SetTimer(WallClimbHandler, this, &AS_Player::StopWallClimb, MaxWallClimbTime);
 
         WallVelocity = 600.f;
@@ -281,7 +296,8 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
 
 void AS_Player::StopWallJump()
 {
-    if (state == WALLJUMP) {
+    if (state == WALLJUMP) 
+    {
         state = NEUTRAL;
         IsDashUp = true;
     }
@@ -307,12 +323,18 @@ FVector AS_Player::GetWallRunDirection()
 
     if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
+        if (WallHit.GetActor() == LastWallHit.GetActor() && WallHit.ImpactNormal == LastWallHit.ImpactNormal)
+            return FVector::ZeroVector;
+
         float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
         if (dot < -0.1f && dot > -0.7f)
             return SetWallVector();
     }
     else if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
+        if (WallHit.GetActor() == LastWallHit.GetActor() && WallHit.ImpactNormal == LastWallHit.ImpactNormal)
+            return FVector::ZeroVector;
+
         float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
         if (dot < -0.1f && dot > -0.7f)
             return SetWallVector();
@@ -345,6 +367,12 @@ void AS_Player::StopWallClimb()
     if (state == WALLCLIMB) state = NEUTRAL;
 }
 
+void AS_Player::Landed(const FHitResult& Hit)
+{
+    Super::Landed(Hit);
+    LastWallHit = Hit;
+}
+
 void AS_Player::UpdateStates(float DeltaTime)
 {
     // Movement
@@ -357,6 +385,7 @@ void AS_Player::UpdateStates(float DeltaTime)
         FVector WallRunDirection = GetWallRunDirection();
         if (WallRunDirection == FVector::ZeroVector)
         {
+            LastWallHit = WallHit;
             WallRunHandler.Invalidate();
             StopWallRun();
             return;
@@ -427,7 +456,7 @@ void AS_Player::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     UpdateStates(DeltaTime);
     
-    if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
+    /*if (!CanDash()) { UE_LOG(LogTemp, Warning, TEXT("----")); }
     else { UE_LOG(LogTemp, Warning, TEXT("Dash")); }
 
     if (!CanSlide()) { UE_LOG(LogTemp, Warning, TEXT("-----")); }
@@ -443,7 +472,10 @@ void AS_Player::Tick(float DeltaTime)
     else { UE_LOG(LogTemp, Warning, TEXT("Slash")); }
 
     if (!CanWallRun()) { UE_LOG(LogTemp, Warning, TEXT("--------")); }
-    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("Wallrun")); }*/
+
+    if (state != WALLCLIMB) { UE_LOG(LogTemp, Warning, TEXT("---------")); }
+    else { UE_LOG(LogTemp, Warning, TEXT("WALLCLIMB")); }
 }
 
 void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -452,6 +484,7 @@ void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent))
     {
+        EnhancedInputComponent->BindAction(MoveAction,      ETriggerEvent::Started,   this, &AS_Player::MoveStart);
         EnhancedInputComponent->BindAction(MoveAction,      ETriggerEvent::Triggered, this, &AS_Player::Move);
         EnhancedInputComponent->BindAction(MoveAction,      ETriggerEvent::Completed, this, &AS_Player::MoveCancel);
         EnhancedInputComponent->BindAction(LookAction,      ETriggerEvent::Triggered, this, &AS_Player::Look);
