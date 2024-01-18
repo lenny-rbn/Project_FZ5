@@ -83,6 +83,11 @@ bool AS_Player::CanWallRun()
     return IsMoving && GetWallRunDirection() != FVector::ZeroVector && !(state == DASH && Player->IsMovingOnGround());
 }
 
+bool AS_Player::CanWallClimb()
+{
+    return IsMoving && GetWallClimbDirection() != FVector::ZeroVector && (Player->IsMovingOnGround() || !IsDashUp);
+}
+
 void AS_Player::Move(const FInputActionValue& Value)
 {
     if (state == NEUTRAL)
@@ -241,10 +246,8 @@ void AS_Player::TakeGun2(const FInputActionValue& Value)
 
 void AS_Player::JumpButton(const FInputActionValue& Value)
 {
-    if (state == WALLRUN)
+    if (state == WALLRUN || state == WALLCLIMB)
     {
-        WallRunHandler.Invalidate();
-        StopWallrun();
         FVector jumpDirection = WallHit.ImpactNormal + FVector::UpVector;
         jumpDirection.Normalize();
         Player->AddImpulse(jumpDirection * 100000.0f);
@@ -254,12 +257,19 @@ void AS_Player::JumpButton(const FInputActionValue& Value)
     else if (CanWallRun())
     {
         state = WALLRUN;
-        GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallrun, MaxWallRunTime);
+        GetWorld()->GetTimerManager().SetTimer(WallRunHandler, this, &AS_Player::StopWallRun, MaxWallRunTime);
 
         if (Player->Velocity.Size2D() < Player->MaxWalkSpeed)
-            WallRunVelocity = 600.f;
+            WallVelocity = 600.f;
         else
-            WallRunVelocity = Player->Velocity.Size2D();
+            WallVelocity = Player->Velocity.Size2D();
+    }
+    else if (CanWallClimb())
+    {
+        state = WALLCLIMB;
+        GetWorld()->GetTimerManager().SetTimer(WallClimbHandler, this, &AS_Player::StopWallClimb, MaxWallClimbTime);
+
+        WallVelocity = 600.f;
     }
 
     if (CanJump())
@@ -271,48 +281,57 @@ void AS_Player::ResetAction()
     action = NONE;
 }
 
+FVector AS_Player::SetWallVector()
+{
+    FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
+    WallVector.Normalize();
+    return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
+}
+
 FVector AS_Player::GetWallRunDirection()
 {
     FVector PlayerLocation = GetActorLocation();
-
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
+
     if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation - GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
         float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
         if (dot < -0.1f && dot > -0.7f)
-        {
-            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
-            WallVector.Normalize();
-            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
-        }
+            return SetWallVector();
     }
     else if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorRightVector() * WallCheckDistance, ECC_Visibility, Params))
     {
         float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
         if (dot < -0.1f && dot > -0.7f)
-        {
-            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
-            WallVector.Normalize();
-            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
-        }
+            return SetWallVector();
     }
-    /*else if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorForwardVector() * WallCheckDistance, ECC_Visibility, Params))
-    {
-        float dot = FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector());
-        if (dot >= -0.7f)
-        {
-            FVector WallVector = FVector::CrossProduct(WallHit.ImpactNormal, FVector::UpVector);
-            WallVector.Normalize();
-            return (FVector::DotProduct(WallVector, GetActorForwardVector()) > 0) ? WallVector : -WallVector;
-        }
-    }*/
+
     return FVector::ZeroVector;
 }
 
-void AS_Player::StopWallrun()
+FVector AS_Player::GetWallClimbDirection()
+{
+    FVector PlayerLocation = GetActorLocation();
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+
+    if (GetWorld()->LineTraceSingleByChannel(WallHit, PlayerLocation, PlayerLocation + GetActorForwardVector() * WallCheckDistance, ECC_Visibility, Params))
+        if (FVector::DotProduct(WallHit.ImpactNormal, GetActorForwardVector()) <= -0.7f)
+            return FVector::UpVector;
+
+    return FVector::ZeroVector;
+}
+
+void AS_Player::StopWallRun()
 {
     if (state == WALLRUN) state = NEUTRAL;
+}
+
+void AS_Player::StopWallClimb()
+{
+    if (state == WALLCLIMB) state = NEUTRAL;
 }
 
 void AS_Player::UpdateStates(float DeltaTime)
@@ -328,13 +347,25 @@ void AS_Player::UpdateStates(float DeltaTime)
         if (WallRunDirection == FVector::ZeroVector)
         {
             WallRunHandler.Invalidate();
-            StopWallrun();
+            StopWallRun();
             return;
         }
 
-        FVector NewVelocity = WallRunDirection * WallRunVelocity;
+        FVector NewVelocity = WallRunDirection * WallVelocity;
         NewVelocity.Z = (Player->Velocity.Z <= 0.f) ? 0.f : Player->Velocity.Z;
         Player->Velocity = NewVelocity;
+    }
+    else if (state == WALLCLIMB)
+    {
+        FVector WallClimbDirection = GetWallClimbDirection();
+        if (WallClimbDirection == FVector::ZeroVector)
+        {
+            WallRunHandler.Invalidate();
+            StopWallClimb();
+            return;
+        }
+
+        Player->Velocity = WallClimbDirection * WallVelocity;
     }
 }
 

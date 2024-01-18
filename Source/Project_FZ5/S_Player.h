@@ -13,7 +13,7 @@ class UInputAction;
 
 enum Item { SWORD, GUN, HEAL, UTIL };
 
-enum State { NEUTRAL, DASH, SLIDE, WALLRUN };
+enum State { NEUTRAL, DASH, SLIDE, WALLRUN, WALLCLIMB };
 
 enum Action { NONE, SWITCH, SLASH, SHOOT, PARRY, GEAR };
 
@@ -53,10 +53,12 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
 		float SlideDeceleration;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
         float WallCheckDistance;
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
         float MaxWallRunTime;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRide", meta = (AllowPrivateAccess = "true"))
+        float MaxWallClimbTime;
 
 	bool IsMoving;
 
@@ -70,7 +72,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool IsParryUp;
 	bool IsSwitchUp;
 
-	float WallRunVelocity;
+	float WallVelocity;
 
 	Item item;
 
@@ -82,8 +84,6 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	FVector DashVelocity;
 
     FHitResult WallHit;
-    FHitResult LeftWallHit;
-    FHitResult RightWallHit;
 
 	FTimerHandle DashHandler;
 	FTimerHandle ParryHandler;
@@ -91,6 +91,7 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	FTimerHandle SlashHandler;
 	FTimerHandle SwitchHandler;
 	FTimerHandle WallRunHandler;
+	FTimerHandle WallClimbHandler;
 
 	UCharacterMovementComponent* Player;
 
@@ -102,7 +103,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	void StopSlash();
 	void StopShoot();
 	void StopParry();
-	void StopWallrun();
+	void StopWallRun();
+	void StopWallClimb();
 
 	bool CanDash();
 	bool CanSlide();
@@ -110,10 +112,13 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanShoot();
 	bool CanSlash();
 	bool CanWallRun();
+	bool CanWallClimb();
 
 	void ResetAction();
 
+	FVector SetWallVector();
 	FVector GetWallRunDirection();
+	FVector GetWallClimbDirection();
 
 protected:
 	virtual void BeginPlay() override;
