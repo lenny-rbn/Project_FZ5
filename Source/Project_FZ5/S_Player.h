@@ -58,6 +58,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++WallRun", meta = (AllowPrivateAccess = "true"))
         float MaxWallRunTime;
 
+	bool IsMoving;
+
 	bool IsDashUp;
 	bool IsSlideUp;
 	bool IsWallRunUp;
