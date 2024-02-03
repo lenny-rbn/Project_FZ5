@@ -6,6 +6,7 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "DrawDebugHelpers.h"
 
 
 AS_Player::AS_Player()
@@ -301,10 +302,30 @@ void AS_Player::Attack(const FInputActionValue& Value)
         action = SLASH;
         IsShootUp = false;
         GetWorld()->GetTimerManager().SetTimer(ShootHandler, this, &AS_Player::StopShoot, ShootingTime);
+
+        TraceCameraToTarget();
     }
 
     StopWallRun();
     StopWallClimb();
+}
+
+void AS_Player::TraceCameraToTarget()
+{
+    FHitResult Hit;
+    FVector Start = Camera->GetComponentLocation();
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+
+    if (GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + Camera->GetForwardVector() * ShootCheckDistance, ECC_Visibility, Params) && Hit.Distance > SpringArm->TargetArmLength)
+    {
+        if (Hit.GetComponent()->ComponentHasTag("Destructible"))
+            DrawDebugLine(GetWorld(), SpringArm->GetComponentLocation() - (FVector::ZAxisVector * 50.0f), Hit.Location, FColor(0, 0, 255), false, 1, 0, 10);
+        else if (Hit.GetComponent()->ComponentHasTag("Player"))
+            DrawDebugLine(GetWorld(), SpringArm->GetComponentLocation() - (FVector::ZAxisVector * 50.0f), Hit.Location, FColor(255, 0, 0), false, 1, 0, 10);
+        else
+            DrawDebugLine(GetWorld(), SpringArm->GetComponentLocation() - (FVector::ZAxisVector * 50.0f), Hit.Location, FColor(0, 255, 0), false, 1, 0, 10);
+    }
 }
 
 void AS_Player::StopSlash()

@@ -46,6 +46,9 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Duration", meta = (AllowPrivateAccess = "true"))
 		float SlashingTime;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Fight", meta = (AllowPrivateAccess = "true"))
+		float ShootCheckDistance;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
 		float DashSpeed;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "++Movement", meta = (AllowPrivateAccess = "true"))
@@ -126,6 +129,8 @@ class PROJECT_FZ5_API AS_Player : public ACharacter
 	bool CanWallClimb();
 
 	void ResetAction();
+
+	void TraceCameraToTarget();
 
 	FVector SetWallVector();
 	FVector GetWallRunDirection();
