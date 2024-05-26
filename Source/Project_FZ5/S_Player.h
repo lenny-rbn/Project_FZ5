@@ -1,7 +1,9 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "S_SlicedMesh.h"
 #include "InputActionValue.h"
 #include "Engine/EngineTypes.h"
+#include "ProceduralMeshComponent.h"
 #include "GameFramework/Character.h"
 
 #include "S_Player.generated.h"
@@ -21,6 +23,20 @@ UCLASS()
 class PROJECT_FZ5_API AS_Player : public ACharacter
 {
 	GENERATED_BODY()
+
+	/* Slicing plane object (invisible) */
+
+	//UPROPERTY(VisibleAnywhere)
+	//USceneComponent* root; //Just an empty root so that the components don't get set as default root (causes problems somehow)
+
+	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
+	UStaticMeshComponent* SlicingPlane;
+
+	TArray<FTimerHandle> TimerHandles;
+
+	FRotator initialRotation;
+
+	//////////////////////////////////////////
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		USpringArmComponent* SpringArm;
@@ -181,4 +197,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void Landed(const FHitResult& Hit) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	void OnAttack();
 };

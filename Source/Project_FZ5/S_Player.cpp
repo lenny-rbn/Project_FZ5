@@ -1,4 +1,9 @@
 #include "S_Player.h"
+
+#include "Kismet/KismetMathLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "KismetProceduralMeshLibrary.h"
+
 #include "Engine/EngineTypes.h"
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -21,6 +26,23 @@ AS_Player::AS_Player()
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
     Camera->bUsePawnControlRotation = false;
+
+    ////////////////////////////////////////////////////////////////
+
+    //root = CreateDefaultSubobject<USceneComponent>(TEXT("EmptyRoot"));
+    //RootComponent = root;
+
+    // Create the slicing plane sub object.
+    SlicingPlane = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SlicingMesh"));
+    SlicingPlane->SetupAttachment(RootComponent/*FirstPersonCameraComponent*/);
+    SlicingPlane->SetVisibility(true);
+    // const float slicingDistY = 1000;
+    // const float slicingDistX = (FVector::ForwardVector * slicingDistY).RotateAngleAxis(FirstPersonCameraComponent->FieldOfView * 0.5f, FVector::UpVector).X;
+    // SlicingPlane->SetWorldScale3D({ slicingDistX, slicingDistY, 1 });
+    SlicingPlane->SetWorldScale3D({ 10, 10, 1 });
+    SlicingPlane->SetRelativeRotation(FRotator(0, 180, 0));
+
+    ////////////////////////////////////////////////////////////////
 }
 
 void AS_Player::BeginPlay()
@@ -54,6 +76,8 @@ void AS_Player::BeginPlay()
     action = NONE;
 
     Player = GetCharacterMovement();
+
+    initialRotation = SlicingPlane->GetRelativeRotation();
 }
 
 #pragma region ENUM...
@@ -292,6 +316,7 @@ void AS_Player::Attack(const FInputActionValue& Value)
 {
     if (CanSlash())
     {
+        OnAttack();
         action = SLASH;
         IsDashUp = true;
         IsSlashUp = false;
@@ -539,5 +564,35 @@ void AS_Player::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
         EnhancedInputComponent->BindAction(TakeSwordAction, ETriggerEvent::Started,   this, &AS_Player::TakeSword);
         EnhancedInputComponent->BindAction(TakeGun1Action,  ETriggerEvent::Started,   this, &AS_Player::TakeGun1);
         EnhancedInputComponent->BindAction(TakeGun2Action,  ETriggerEvent::Started,   this, &AS_Player::TakeGun2);
+    }
+}
+
+void AS_Player::OnAttack()
+{
+    TimerHandles.Empty();
+    TArray<UPrimitiveComponent*> OverlappedComponents = {};
+    UKismetSystemLibrary::ComponentOverlapComponents(SlicingPlane, SlicingPlane->GetComponentTransform(),
+        { UEngineTypes::ConvertToObjectType(ECC_WorldStatic) }, nullptr, {}, OverlappedComponents);
+
+    for (UPrimitiveComponent* Component : OverlappedComponents)
+    {
+        UProceduralMeshComponent* ProceduralMesh = Cast<UProceduralMeshComponent>(Component);
+        if (!ProceduralMesh || !ProceduralMesh->IsValidLowLevel()) continue;
+        AS_SlicedMesh* SliceableMesh = Cast<AS_SlicedMesh>(Component->GetOwner());
+        if (!SliceableMesh || !SliceableMesh->IsValidLowLevel()) continue;
+
+        const FVector CamLocation = SlicingPlane->GetComponentLocation();// FirstPersonCameraComponent->GetComponentLocation();
+        const FVector CamUpVector = SlicingPlane->GetUpVector();// FirstPersonCameraComponent->GetUpVector();
+        const FVector ProcMeshLoc = ProceduralMesh->GetComponentLocation();
+        const FVector ProcMeshLocPlane = UKismetMathLibrary::ProjectPointOnToPlane(ProcMeshLoc, CamLocation, CamUpVector);
+
+        FHitResult HitResult;
+        UKismetSystemLibrary::LineTraceSingle(GetWorld(), CamLocation, ProcMeshLocPlane, TraceTypeQuery1, false, {}, EDrawDebugTrace::Type::Persistent, HitResult, true);
+        if (!HitResult.IsValidBlockingHit()) continue;
+
+        FTimerHandle Handle;
+        GetWorldTimerManager().SetTimer(Handle, [=]() { SliceableMesh->Slice(ProceduralMesh, HitResult.ImpactPoint, CamUpVector); }, 0.6f, false);
+
+        TimerHandles.Add(Handle);
     }
 }
