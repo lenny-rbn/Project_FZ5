@@ -35,12 +35,12 @@ AS_Player::AS_Player()
     // Create the slicing plane sub object.
     SlicingPlane = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SlicingMesh"));
     SlicingPlane->SetupAttachment(RootComponent/*FirstPersonCameraComponent*/);
-    SlicingPlane->SetVisibility(true);
+    SlicingPlane->SetVisibility(false);
     // const float slicingDistY = 1000;
     // const float slicingDistX = (FVector::ForwardVector * slicingDistY).RotateAngleAxis(FirstPersonCameraComponent->FieldOfView * 0.5f, FVector::UpVector).X;
     // SlicingPlane->SetWorldScale3D({ slicingDistX, slicingDistY, 1 });
-    SlicingPlane->SetWorldScale3D({ 10, 10, 1 });
-    SlicingPlane->SetRelativeRotation(FRotator(0, 180, 0));
+    SlicingPlane->SetWorldScale3D({ 3, 2, 1 });
+    SlicingPlane->SetRelativeRotation(FRotator(0, 0, 90));
 
     ////////////////////////////////////////////////////////////////
 }
@@ -244,6 +244,8 @@ void AS_Player::Dash(const FInputActionValue& Value)
 {
     if (CanDash())
     {
+        AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this] { OnAttack(); });
+
         if (state == WALLJUMP) WallReset = true;
 
         state = DASH;
@@ -316,7 +318,7 @@ void AS_Player::Attack(const FInputActionValue& Value)
 {
     if (CanSlash())
     {
-        OnAttack();
+        AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this] { OnAttack(); });
         action = SLASH;
         IsDashUp = true;
         IsSlashUp = false;
@@ -587,12 +589,15 @@ void AS_Player::OnAttack()
         const FVector ProcMeshLocPlane = UKismetMathLibrary::ProjectPointOnToPlane(ProcMeshLoc, CamLocation, CamUpVector);
 
         FHitResult HitResult;
-        UKismetSystemLibrary::LineTraceSingle(GetWorld(), CamLocation, ProcMeshLocPlane, TraceTypeQuery1, false, {}, EDrawDebugTrace::Type::Persistent, HitResult, true);
+        TArray<AActor*> CollisionQuery;
+        CollisionQuery.Add(this);
+        UKismetSystemLibrary::LineTraceSingle(GetWorld(), CamLocation, ProcMeshLocPlane, TraceTypeQuery1, false, CollisionQuery, EDrawDebugTrace::Type::None, HitResult, true);
         if (!HitResult.IsValidBlockingHit()) continue;
 
-        FTimerHandle Handle;
-        GetWorldTimerManager().SetTimer(Handle, [=]() { SliceableMesh->Slice(ProceduralMesh, HitResult.ImpactPoint, CamUpVector); }, 0.6f, false);
+        //FTimerHandle Handle;
+        //GetWorldTimerManager().SetTimer(Handle, [=]() { SliceableMesh->Slice(ProceduralMesh, HitResult.ImpactPoint, CamUpVector); }, 0.6f, false);
+        SliceableMesh->Slice(ProceduralMesh, HitResult.ImpactPoint, CamUpVector);
 
-        TimerHandles.Add(Handle);
+        //TimerHandles.Add(Handle);
     }
 }

@@ -54,17 +54,20 @@ void AS_SlicedMesh::Slice(UProceduralMeshComponent* ProcMesh, FVector PlanePosit
 	UProceduralMeshComponent* UpperProceduralMesh = (LowerProceduralMesh == ProcMesh ? NewProcMesh : ProcMesh);
 
 	// Make sure that a grounded procedural mesh slice stays grounded and non simulated.
-	if (bIsGrounded)
-	{
-		ProceduralMesh = LowerProceduralMesh;
-	}
-	else
-	{
-		SetupMesh(LowerProceduralMesh, true, true, true);
-		LowerProceduralMesh->AddImpulse(/*{ 0, 0, 1000 }*/(-PlaneNormal / PlaneNormal.Size()) * 1000, NAME_None, true);
-	}
+	//if (bIsGrounded)
+	//{
+	//	ProceduralMesh = LowerProceduralMesh;
+	//}
+	//else
+	//{
+	//	SetupMesh(LowerProceduralMesh, true, true, true);
+	//	LowerProceduralMesh->AddImpulse(/*{ 0, 0, 1000 }*/(-PlaneNormal / PlaneNormal.Size()) * 1000, NAME_None, true);
+	//}
 
-	// Enable simulation for the upper procedural mesh slice and move it up.
+	// Enable simulation for the procedural meshes.
+	SetupMesh(LowerProceduralMesh, true, true, true);
+	LowerProceduralMesh->AddImpulse(/*{ 0, 0, 1000 }*/(-PlaneNormal / PlaneNormal.Size()) * 1000, NAME_None, true);
+
 	SetupMesh(UpperProceduralMesh, true, true, true);
 	UpperProceduralMesh->AddImpulse(/*{ 0, 0, 1000 }*/(PlaneNormal / PlaneNormal.Size()) * 1000, NAME_None, true);
 }

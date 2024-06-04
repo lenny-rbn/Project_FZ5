@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "Async/Async.h"
 #include "S_SlicedMesh.h"
 #include "InputActionValue.h"
 #include "Engine/EngineTypes.h"
